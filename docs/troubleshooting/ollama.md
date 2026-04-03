@@ -4,35 +4,25 @@
 
 ### Problem
 
-When using Ollama as a provider with oh-my-openagent agents, you may encounter:
+When using Ollama as a provider with this fork, tool-using sessions may fail with:
 
-```
+```text
 JSON Parse error: Unexpected EOF
 ```
 
-This occurs when agents attempt tool calls (e.g., `explore` agent using `mcp_grep_search`).
+This usually appears when an agent performs tool calls and the underlying provider response is streamed as NDJSON.
 
 ### Root Cause
 
-Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used in API requests:
+Ollama returns newline-delimited JSON when `stream: true` is enabled.
 
-```json
-{"message":{"tool_calls":[{"function":{"name":"read","arguments":{"filePath":"README.md"}}}]}, "done":false}
-{"message":{"content":""}, "done":true}
-```
+The surrounding SDK path expects a single JSON object, not a stream of JSON lines, so tool-call parsing can fail before the agent receives a valid structured response.
 
-Claude Code SDK expects a single JSON object, not multiple NDJSON lines, causing the parse error.
+This is not specific to one design agent. Any tool-using path can hit it.
 
-**Why this happens:**
-- **Ollama API**: Returns streaming responses as NDJSON by design
-- **Claude Code SDK**: Doesn't properly handle NDJSON responses for tool calls
-- **oh-my-openagent**: Passes through the SDK's behavior (can't fix at this layer)
+### Recommended Fix
 
-## Solutions
-
-### Option 1: Disable Streaming (Recommended)
-
-Configure your Ollama provider to use `stream: false`:
+Disable streaming for the Ollama provider:
 
 ```json
 {
@@ -42,86 +32,32 @@ Configure your Ollama provider to use `stream: false`:
 }
 ```
 
-**Pros:**
-- Works immediately
-- No code changes needed
-- Simple configuration
+### Why This Works
 
-**Cons:**
-- Slightly slower response time (no streaming)
-- Less interactive feedback
+With `stream: false`, Ollama returns a single JSON response instead of NDJSON. That avoids the parse mismatch in the upstream request path.
 
-### Option 2: Use Non-Tool Agents Only
+### Tradeoff
 
-If you need streaming, avoid agents that use tools:
+- more reliable tool behavior
+- slightly less interactive response streaming
 
-- **Safe**: Simple text generation, non-tool tasks
-- **Problematic**: Any agent with tool calls (explore, librarian, etc.)
+### What Is Safe
 
-### Option 3: Wait for SDK Fix
+Safer:
 
-The proper fix requires Claude Code SDK to:
+- simple non-tool prompts
+- sessions that do not depend on structured tool calls
 
-1. Detect NDJSON responses
-2. Parse each line separately
-3. Merge `tool_calls` from multiple lines
-4. Return a single merged response
+Riskier:
 
-**Tracking**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124
+- tool-heavy exploration
+- `figma-use` driven execution
+- any flow that depends on structured tool-call parsing
 
-## Workaround Implementation
+### Validation
 
-Until the SDK is fixed, here's how to implement NDJSON parsing (for SDK maintainers):
+After disabling streaming, retry the same request and confirm that the session can complete tool calls without the parse error.
 
-```typescript
-async function parseOllamaStreamResponse(response: string): Promise<object> {
-  const lines = response.split('\n').filter(line => line.trim());
-  const mergedMessage = { tool_calls: [] };
+### Related Notes
 
-  for (const line of lines) {
-    try {
-      const json = JSON.parse(line);
-      if (json.message?.tool_calls) {
-        mergedMessage.tool_calls.push(...json.message.tool_calls);
-      }
-      if (json.message?.content) {
-        mergedMessage.content = json.message.content;
-      }
-    } catch (e) {
-      // Skip malformed lines
-      console.warn('Skipping malformed NDJSON line:', line);
-    }
-  }
-
-  return mergedMessage;
-}
-```
-
-## Testing
-
-To verify the fix works:
-
-```bash
-# Test with curl (should work with stream: false)
-curl -s http://localhost:11434/api/chat \
-  -d '{
-    "model": "qwen3-coder",
-    "messages": [{"role": "user", "content": "Read file README.md"}],
-    "stream": false,
-    "tools": [{"type": "function", "function": {"name": "read", "description": "Read a file", "parameters": {"type": "object", "properties": {"filePath": {"type": "string"}}, "required": ["filePath"]}}}]
-  }'
-```
-
-## Related Issues
-
-- **oh-my-openagent**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124
-- **Ollama API Docs**: https://github.com/ollama/ollama/blob/main/docs/api.md
-
-## Getting Help
-
-If you encounter this issue:
-
-1. Check your Ollama provider configuration
-2. Set `stream: false` as a workaround
-3. Report any additional errors to the issue tracker
-4. Provide your configuration (without secrets) for debugging
+This is a transport/runtime compatibility issue, not a design-agent planning issue. If the provider response cannot be parsed correctly, the higher-level design workflow cannot recover from that alone.

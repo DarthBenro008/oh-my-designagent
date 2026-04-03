@@ -18,6 +18,7 @@ export const BuiltinSkillNameSchema = z.enum([
   "playwright",
   "agent-browser",
   "dev-browser",
+  "figma-use",
   "frontend-ui-ux",
   "git-master",
 ])

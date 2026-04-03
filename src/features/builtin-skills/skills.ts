@@ -1,10 +1,12 @@
 import type { BuiltinSkill } from "./types"
 import type { BrowserAutomationProvider } from "../../config/schema"
+import type { FigmaUseConfig } from "../../config"
 
 import {
   playwrightSkill,
   agentBrowserSkill,
   playwrightCliSkill,
+  createFigmaUseSkill,
   frontendUiUxSkill,
   gitMasterSkill,
   devBrowserSkill,
@@ -14,11 +16,12 @@ import {
 
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
+  figmaUseConfig?: FigmaUseConfig
   disabledSkills?: Set<string>
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const { browserProvider = "playwright", disabledSkills } = options
+  const { browserProvider = "playwright", figmaUseConfig, disabledSkills } = options
 
   let browserSkill: BuiltinSkill
   if (browserProvider === "agent-browser") {
@@ -30,6 +33,9 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
   }
 
   const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, reviewWorkSkill, aiSlopRemoverSkill]
+  if (figmaUseConfig?.enabled) {
+    skills.push(createFigmaUseSkill(figmaUseConfig))
+  }
 
   if (!disabledSkills) {
     return skills

@@ -61,6 +61,7 @@ export async function createSkillContext(args: {
 
   const builtinSkills = createBuiltinSkills({
     browserProvider,
+    figmaUseConfig: pluginConfig.figma_use,
     disabledSkills,
   }).filter((skill) => {
     if (skill.mcpConfig) {

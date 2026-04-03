@@ -1,195 +1,101 @@
 # Manifesto
 
-The principles and philosophy behind Oh My OpenAgent.
+The principles behind the design-agent fork.
 
----
+## Design Feedback Should Resolve Cleanly
 
-## Human Intervention is a Failure Signal
+Figma comments are often not really about a pixel tweak.
 
-**HUMAN IN THE LOOP = BOTTLENECK**
+They usually encode a mix of:
 
-Think about autonomous driving. When a human has to take over the wheel, that's not a feature. It's a failure of the system. The car couldn't handle the situation on its own.
+- product intent
+- design-system rules
+- user behavior assumptions
+- copy guidance
+- visual quality expectations
 
-**Why is coding any different?**
+A useful agent should not respond to that with a blind patch.
 
-When you find yourself:
-- Fixing the AI's half-finished code
-- Manually correcting obvious mistakes
-- Guiding the agent step-by-step through a task
-- Repeatedly clarifying the same requirements
+It should resolve the comment in a way that still fits the product, the system, and the team’s rules.
 
-That's not "human-AI collaboration." That's the AI failing to do its job.
+## Project Guidance Is Not Optional
 
-**Oh My OpenAgent is built on this premise**: Human intervention during agentic work is fundamentally a wrong signal. If the system is designed correctly, the agent should complete the work without requiring you to babysit it.
+Most design failures happen because the agent acts without enough context.
 
----
+That is why this fork treats project guidance as operating instructions:
 
-## Indistinguishable Code
+- read `docs/` first
+- load only the most relevant memory
+- treat rules and instructions as binding context
+- surface conflicts instead of improvising around them
 
-**Goal: Code written by the agent should be indistinguishable from code written by a senior engineer.**
+If a comment looks simple but the docs say otherwise, the docs win until clarified.
 
-Not "AI-generated code that needs cleanup." Not "a good starting point." The actual, final, production-ready code.
+## Mutation Alone Is Not Success
 
-This means:
-- Following existing codebase patterns exactly
-- Proper error handling without being asked
-- Tests that actually test the right things
-- No AI slop (over-engineering, unnecessary abstractions, scope creep)
-- Comments only when they add value
+A change is not done because the canvas changed.
 
-If you can tell whether a commit was made by a human or an agent, the agent has failed.
+Success means:
 
----
+- the target comment is actually resolved
+- the result still fits the design language
+- product behavior and copy remain coherent
+- tokens, spacing, variables, and structure still respect the system
 
-## Token Cost vs Productivity
+That is why this fork uses a planner, executor, reviewer, and auditor instead of a single mutation step.
 
-**Higher token usage is acceptable if it significantly increases productivity.**
+## The Default Flow Should Feel Predictable
 
-Using more tokens to:
-- Have multiple specialized agents research in parallel
-- Get the job done completely without human intervention
-- Verify work thoroughly before completion
-- Accumulate knowledge across tasks
+The ideal loop is:
 
-That's a worthwhile investment when it means 10x, 20x, or 100x productivity gains.
+1. understand the comment
+2. load the right context
+3. inspect the canvas
+4. apply the smallest viable change
+5. review and audit the result
+6. retry or clarify when needed
 
-**However:**
+The system should not require the user to micromanage these steps every time.
 
-Unnecessary token waste is not pursued. The system optimizes for:
-- Using cheaper models (Haiku, Flash) for simple tasks
-- Avoiding redundant exploration
-- Caching learnings across sessions
-- Stopping research when sufficient context is gathered
+## Docs-First Memory Over Prompt Theater
 
-Token efficiency matters. But not at the cost of work quality or human cognitive load.
+This fork does not rely on giant static prompts pretending to be memory.
 
----
+Instead it uses:
 
-## Minimize Human Cognitive Load
+- docs-first file discovery
+- session-scoped context injection
+- deduplicated memory packets
+- existing context management already present in the plugin
 
-**The human should only need to say what they want. Everything else is the agent's job.**
+That keeps memory grounded in repo truth instead of hand-written prompt drift.
 
-Two approaches achieve this:
+## Figma Is A Real Runtime Surface
 
-### Approach 1: Prometheus (Interview Mode)
+Design work should happen against real Figma state whenever possible.
 
-You say: "I want to add authentication."
+That is why `figma-use` MCP is a first-class part of the fork:
 
-Prometheus:
-- Researches your codebase to understand existing patterns
-- Asks clarifying questions based on actual findings
-- Surfaces edge cases you hadn't considered
-- Documents decisions as you make them
-- Generates a complete work plan
+- inspect before mutating
+- mutate through the plugin API surface
+- inspect or export again after changes
 
-**You provide intent. The agent provides structure.**
+If live state is unavailable, the system can still plan and audit, but it should not pretend it executed.
 
-### Approach 2: Ultrawork (Just Do It Mode)
+## What Good Looks Like
 
-You say: "ulw add authentication"
+The end state is simple:
 
-The agent:
-- Figures out the right approach
-- Researches best practices
-- Implements following conventions
-- Verifies everything works
-- Keeps going until complete
+- the user gives design intent or a Figma comment
+- the system loads the right guidance
+- the comment is resolved cleanly
+- the result still fits the product and the system
 
-**You provide intent. The agent handles everything.**
-
-In both cases, the human's job is to **express what they want**, not to manage how it gets done.
-
----
-
-## Predictable, Continuous, Delegatable
-
-**The ideal agent should work like a compiler**: markdown document goes in, working code comes out.
-
-### Predictable
-
-Given the same inputs:
-- Same codebase patterns
-- Same requirements
-- Same constraints
-
-The output should be consistent. Not random, not surprising, not "creative" in ways you didn't ask for.
-
-### Continuous
-
-Work should survive interruptions:
-- Session crashes? Resume with `/start-work`
-- Need to step away? Progress is tracked
-- Multi-day project? Context is preserved
-
-The agent maintains state. You don't have to.
-
-### Delegatable
-
-Just like you can assign a task to a capable team member and trust them to handle it, you should be able to delegate to the agent.
-
-This means:
-- Clear acceptance criteria, verified independently
-- Self-correcting behavior when something goes wrong
-- Escalation (to Oracle, to user) only when truly needed
-- Complete work, not "mostly done"
-
----
-
-## The Core Loop
-
-```
-Human Intent → Agent Execution → Verified Result
-       ↑                              ↓
-       └──────── Minimum ─────────────┘
-          (intervention only on true failure)
-```
-
-Everything in Oh My OpenAgent is designed to make this loop work:
-
-| Feature | Purpose |
-|---------|---------|
-| Prometheus | Extract intent through intelligent interview |
-| Metis | Catch ambiguities before they become bugs |
-| Momus | Verify plans are complete before execution |
-| Orchestrator | Coordinate work without human micromanagement |
-| Todo Continuation | Force completion, prevent "I'm done" lies |
-| Category System | Route to optimal model without human decision |
-| Background Agents | Parallel research without blocking user |
-| Wisdom Accumulation | Learn from work, don't repeat mistakes |
-
----
-
-## What This Means in Practice
-
-**You should be able to:**
-
-1. Describe what you want (high-level or detailed, your choice)
-2. Let the agent interview you if needed
-3. Confirm the plan (or just let ultrawork handle it)
-4. Walk away
-5. Come back to completed, verified, production-ready work
-
-**If you can't do this, something in the system needs to improve.**
-
----
-
-## The Future We're Building
-
-A world where:
-- Human developers focus on **what** to build, not **how** to get AI to build it
-- Code quality is independent of who (or what) wrote it
-- Complex projects are as easy as simple ones (just take longer)
-- "Prompt engineering" becomes as obsolete as "compiler debugging"
-
-**The agent should be invisible.** Not in the sense that it's hidden, but in the sense that it just works. Like electricity, like running water, like the internet.
-
-You flip the switch. The light turns on. You don't think about the power grid.
-
-That's the goal.
-
----
+If the user has to keep re-explaining the product, the style rules, or the expected behavior, the documentation or memory path is not good enough yet.
 
 ## Further Reading
 
 - [Overview](./guide/overview.md)
-- [Orchestration Guide](./guide/orchestration.md)
+- [Orchestration](./guide/orchestration.md)
+- [Configuration](./reference/configuration.md)
+- [Design Agents and Hooks](./reference/design-agents.md)

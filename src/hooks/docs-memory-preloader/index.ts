@@ -1,0 +1,1 @@
+export { createDocsMemoryPreloaderHook } from "./hook"

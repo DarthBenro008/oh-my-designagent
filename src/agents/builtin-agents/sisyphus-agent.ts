@@ -6,7 +6,7 @@ import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable } from "../../sha
 import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
-import { createSisyphusAgent } from "../sisyphus"
+import { createSolacyAgent } from "../design-agents"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
@@ -21,7 +21,10 @@ export function maybeCreateSisyphusConfig(input: {
   mergedCategories: Record<string, CategoryConfig>
   directory?: string
   userCategories?: CategoriesConfig
-  useTaskSystem: boolean
+  useTaskSystem?: boolean
+  memorySummary?: string
+  figmaUseEnabled?: boolean
+  figmaUseServerName?: string
   disableOmoEnv?: boolean
 }): AgentConfig | undefined {
   const {
@@ -36,7 +39,9 @@ export function maybeCreateSisyphusConfig(input: {
     availableCategories,
     mergedCategories,
     directory,
-    useTaskSystem,
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
     disableOmoEnv = false,
   } = input
 
@@ -66,14 +71,15 @@ export function maybeCreateSisyphusConfig(input: {
   if (!sisyphusResolution) return undefined
   const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
-  let sisyphusConfig = createSisyphusAgent(
-    sisyphusModel,
+  let sisyphusConfig = createSolacyAgent({
+    model: sisyphusModel,
     availableAgents,
-    undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
-  )
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
+  })
 
   if (sisyphusResolvedVariant) {
     sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }

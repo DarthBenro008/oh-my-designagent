@@ -119,6 +119,7 @@ export function mergeConfigs(
     ...override,
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
+    design_memory: deepMerge(base.design_memory, override.design_memory),
     disabled_agents: [
       ...new Set([
         ...(base.disabled_agents ?? []),
@@ -162,6 +163,8 @@ export function mergeConfigs(
       ]),
     ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
+    figma: deepMerge(base.figma, override.figma),
+    figma_use: deepMerge(base.figma_use, override.figma_use),
   };
 }
 

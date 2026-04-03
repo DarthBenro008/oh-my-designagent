@@ -1,7 +1,8 @@
 import { createBuiltinAgents } from "../agents";
-import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
+import { createCanvasExecutorAgentWithOverrides } from "../agents/canvas-executor";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
+import { loadDesignMemoryPacket } from "../shared/design-memory";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import { registerAgentName } from "../features/claude-code-session-state";
@@ -120,6 +121,10 @@ export async function applyAgentConfig(params: {
         ? ((config as Record<string, unknown>).description as string)
         : "",
     }));
+  const designMemoryPacket = loadDesignMemoryPacket({
+    directory: params.ctx.directory,
+    config: params.pluginConfig.design_memory,
+  });
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -135,6 +140,8 @@ export async function applyAgentConfig(params: {
     disabledSkills,
     useTaskSystem,
     disableOmoEnv,
+    params.pluginConfig.design_memory,
+    params.pluginConfig.figma_use,
   );
 
   const disabledAgentNames = new Set(
@@ -167,11 +174,13 @@ export async function applyAgentConfig(params: {
       sisyphus: builtinAgents.sisyphus,
     };
 
-    agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
-      params.pluginConfig.agents?.["sisyphus-junior"],
-      (builtinAgents.atlas as { model?: string } | undefined)?.model,
-      useTaskSystem,
-    );
+    agentConfig["sisyphus-junior"] = createCanvasExecutorAgentWithOverrides({
+      override: params.pluginConfig.agents?.["sisyphus-junior"],
+      systemDefaultModel: (builtinAgents.atlas as { model?: string } | undefined)?.model,
+      memorySummary: designMemoryPacket.summary,
+      figmaUseEnabled: params.pluginConfig.figma_use?.enabled ?? false,
+      figmaUseServerName: params.pluginConfig.figma_use?.mcp_server_name,
+    });
 
     if (builderEnabled) {
       const { name: _buildName, ...buildConfigWithoutName } =

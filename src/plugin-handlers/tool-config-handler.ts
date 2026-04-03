@@ -115,9 +115,10 @@ export function applyToolConfig(params: {
   if (junior) {
     junior.permission = {
       ...junior.permission,
-      task: "allow",
-      "task_*": "allow",
-      teammate: "allow",
+      task: "deny",
+      call_omo_agent: "deny",
+      "task_*": "deny",
+      teammate: "deny",
       ...denyTodoTools,
     };
   }

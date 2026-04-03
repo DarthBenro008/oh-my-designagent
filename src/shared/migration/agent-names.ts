@@ -4,6 +4,10 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   OmO: "sisyphus",
   Sisyphus: "sisyphus",
   sisyphus: "sisyphus",
+  solacy: "sisyphus",
+  Solacy: "sisyphus",
+  "Sisyphus (Ultraworker)": "sisyphus",
+  "sisyphus (ultraworker)": "sisyphus",
 
   // Prometheus variants → "prometheus"
   "OmO-Plan": "prometheus",
@@ -17,25 +21,48 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "orchestrator-sisyphus": "atlas",
   Atlas: "atlas",
   atlas: "atlas",
+  "comment-conductor": "atlas",
+  "Comment Conductor": "atlas",
+  "Atlas (Plan Executor)": "atlas",
+  "atlas (plan executor)": "atlas",
 
   // Metis variants → "metis"
   "plan-consultant": "metis",
   "Metis (Plan Consultant)": "metis",
   metis: "metis",
+  "comment-planner": "metis",
+  "Comment Planner": "metis",
+  "Metis (Plan Consultant)": "metis",
+  "metis (plan consultant)": "metis",
 
   // Momus variants → "momus"
   "Momus (Plan Reviewer)": "momus",
   momus: "momus",
+  "vision-reviewer": "momus",
+  "Vision Reviewer": "momus",
+  "Momus (Plan Critic)": "momus",
+  "momus (plan critic)": "momus",
 
   // Sisyphus-Junior → "sisyphus-junior"
+  "Sisyphus-Junior": "sisyphus-junior",
+  "sisyphus-junior": "sisyphus-junior",
+  "canvas-executor": "sisyphus-junior",
+  "Canvas Executor": "sisyphus-junior",
   "Sisyphus-Junior": "sisyphus-junior",
   "sisyphus-junior": "sisyphus-junior",
 
   // Already lowercase - passthrough
   build: "build",
   oracle: "oracle",
+  "design-auditor": "oracle",
+  "Design Auditor": "oracle",
+  "Hephaestus (Deep Agent)": "hephaestus",
+  "hephaestus (deep agent)": "hephaestus",
   librarian: "librarian",
   explore: "explore",
+  hephaestus: "hephaestus",
+  "design-worker": "hephaestus",
+  "Design Worker": "hephaestus",
   "multimodal-looker": "multimodal-looker",
 }
 

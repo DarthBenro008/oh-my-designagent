@@ -3,7 +3,7 @@ import type { AgentOverrides } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
-import { createHephaestusAgent } from "../hephaestus"
+import { createDesignWorkerAgent } from "../design-agents"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -19,7 +19,10 @@ export function maybeCreateHephaestusConfig(input: {
   availableCategories: AvailableCategory[]
   mergedCategories: Record<string, CategoryConfig>
   directory?: string
-  useTaskSystem: boolean
+  useTaskSystem?: boolean
+  memorySummary?: string
+  figmaUseEnabled?: boolean
+  figmaUseServerName?: string
   disableOmoEnv?: boolean
 }): AgentConfig | undefined {
   const {
@@ -33,7 +36,9 @@ export function maybeCreateHephaestusConfig(input: {
     availableCategories,
     mergedCategories,
     directory,
-    useTaskSystem,
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
     disableOmoEnv = false,
   } = input
 
@@ -65,14 +70,15 @@ export function maybeCreateHephaestusConfig(input: {
   if (!hephaestusResolution) return undefined
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
-  let hephaestusConfig = createHephaestusAgent(
-    hephaestusModel,
+  let hephaestusConfig = createDesignWorkerAgent({
+    model: hephaestusModel,
     availableAgents,
-    undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
-  )
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
+  })
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 

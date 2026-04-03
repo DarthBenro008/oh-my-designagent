@@ -5,7 +5,7 @@ import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-bui
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
-import { createAtlasAgent } from "../atlas"
+import { createCommentConductorAgent } from "../design-agents"
 
 export function maybeCreateAtlasConfig(input: {
   disabledAgents: string[]
@@ -19,6 +19,9 @@ export function maybeCreateAtlasConfig(input: {
   directory?: string
   userCategories?: CategoriesConfig
   useTaskSystem?: boolean
+  memorySummary?: string
+  figmaUseEnabled?: boolean
+  figmaUseServerName?: string
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -31,6 +34,9 @@ export function maybeCreateAtlasConfig(input: {
     mergedCategories,
     directory,
     userCategories,
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
   } = input
 
   if (disabledAgents.includes("atlas")) return undefined
@@ -49,11 +55,18 @@ export function maybeCreateAtlasConfig(input: {
   if (!atlasResolution) return undefined
   const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
 
-  let orchestratorConfig = createAtlasAgent({
+  let orchestratorConfig = createCommentConductorAgent({
     model: atlasModel,
     availableAgents,
+    availableCategories: userCategories ? Object.entries(userCategories).map(([name, value]) => ({
+      name,
+      description: value.description ?? "",
+      model: value.model,
+    })) : [],
     availableSkills,
-    userCategories,
+    memorySummary,
+    figmaUseEnabled,
+    figmaUseServerName,
   })
 
   if (atlasResolvedVariant) {

@@ -1,22 +1,24 @@
+import { AGENT_NAME_MAP } from "./migration/agent-names"
+
 /**
  * Agent config keys to display names mapping.
  * Config keys are lowercase (e.g., "sisyphus", "atlas").
  * Display names include suffixes for UI/logs (e.g., "Sisyphus (Ultraworker)").
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  sisyphus: "Sisyphus (Ultraworker)",
-  hephaestus: "Hephaestus (Deep Agent)",
+  sisyphus: "Solacy (Design Lead)",
+  hephaestus: "Design Worker",
   prometheus: "Prometheus (Plan Builder)",
-  atlas: "Atlas (Plan Executor)",
-  "sisyphus-junior": "Sisyphus-Junior",
-  metis: "Metis (Plan Consultant)",
-  momus: "Momus (Plan Critic)",
+  atlas: "Comment Conductor",
+  "sisyphus-junior": "Canvas Executor",
+  metis: "Comment Planner",
+  momus: "Vision Reviewer",
   athena: "Athena (Council)",
   "athena-junior": "Athena-Junior (Council)",
-  oracle: "oracle",
-  librarian: "librarian",
-  explore: "explore",
-  "multimodal-looker": "multimodal-looker",
+  oracle: "Design Auditor",
+  librarian: "Librarian",
+  explore: "Explore",
+  "multimodal-looker": "Multimodal Looker",
   "council-member": "council-member",
 }
 
@@ -28,29 +30,36 @@ function stripAgentListSortPrefix(agentName: string): string {
   return agentName.replace(/^\u200B+/, "")
 }
 
+function normalizeAgentKey(agentName: string): string {
+  return AGENT_NAME_MAP[agentName.toLowerCase()] ?? AGENT_NAME_MAP[agentName] ?? agentName
+}
+
 /**
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
+  const normalizedKey = normalizeAgentKey(configKey)
+
   // Try exact match first
-  const exactMatch = AGENT_DISPLAY_NAMES[configKey]
+  const exactMatch = AGENT_DISPLAY_NAMES[normalizedKey]
   if (exactMatch !== undefined) return exactMatch
   
   // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
+  const lowerKey = normalizedKey.toLowerCase()
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
   
   // Unknown agent: return original key
-  return configKey
+  return normalizedKey
 }
 
 export function getAgentListDisplayName(configKey: string): string {
-  const displayName = getAgentDisplayName(configKey)
-  const prefix = AGENT_LIST_SORT_PREFIXES[configKey.toLowerCase()]
+  const normalizedKey = normalizeAgentKey(configKey).toLowerCase()
+  const displayName = getAgentDisplayName(normalizedKey)
+  const prefix = AGENT_LIST_SORT_PREFIXES[normalizedKey]
 
   return prefix ? `${prefix}${displayName}` : displayName
 }
@@ -68,7 +77,7 @@ export function getAgentConfigKey(agentName: string): string {
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
-  return lower
+  return normalizeAgentKey(lower).toLowerCase()
 }
 
 /**

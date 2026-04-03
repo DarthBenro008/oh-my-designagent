@@ -3,6 +3,7 @@ import type { PluginContext } from "../types"
 
 import {
   createClaudeCodeHooksHook,
+  createDocsMemoryPreloaderHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
   createToolPairValidatorHook,
@@ -16,6 +17,7 @@ import { safeCreateHook } from "../../shared/safe-create-hook"
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
+  docsMemoryPreloader: ReturnType<typeof createDocsMemoryPreloaderHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
@@ -54,6 +56,20 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const docsMemoryPreloader =
+    pluginConfig.design_memory?.enabled && isHookEnabled("docs-memory-preloader")
+      ? safeCreateHook(
+          "docs-memory-preloader",
+          () =>
+            createDocsMemoryPreloaderHook(
+              ctx,
+              pluginConfig.design_memory,
+              contextCollector,
+            ),
+          { enabled: safeHookEnabled },
+        )
+      : null
+
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector)
 
@@ -76,6 +92,7 @@ export function createTransformHooks(args: {
   return {
     claudeCodeHooks,
     keywordDetector,
+    docsMemoryPreloader,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
     toolPairValidator,

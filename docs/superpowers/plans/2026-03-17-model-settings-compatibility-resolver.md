@@ -1,86 +1,61 @@
-# Model Settings Compatibility Resolver Implementation Plan
+# Model Settings Compatibility Resolver Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+Internal implementation plan retained as technical documentation for the fork.
 
-**Goal:** Centralize compatibility handling for `variant` and `reasoningEffort` so an already-selected model receives the best valid settings for that exact model.
+## Goal
 
-**Architecture:** Introduce a pure shared resolver in `src/shared/` that computes compatible settings and records downgrades/removals. Integrate it first in `chat.params`, then keep Claude-specific effort logic as a thin layer rather than a special-case policy owner.
+Centralize compatibility handling for `variant` and `reasoningEffort` so an already-selected model receives the best valid settings for that exact model.
 
-**Tech Stack:** TypeScript, Bun test, existing shared model normalization/utilities, OpenCode plugin `chat.params` path.
+This remains relevant to the design-agent fork because the design workflow still depends on stable request-time model settings for:
 
----
+- Solacy
+- Comment Conductor
+- reviewer and auditor agents
+- multimodal and Figma-adjacent request paths
 
-### Task 1: Create the pure compatibility resolver
+## Intended Architecture
 
-**Files:**
-- Create: `src/shared/model-settings-compatibility.ts`
-- Create: `src/shared/model-settings-compatibility.test.ts`
-- Modify: `src/shared/index.ts`
+Introduce a shared pure resolver in `src/shared/` that computes compatible settings and records downgrades or removals.
 
-- [ ] **Step 1: Write failing tests for exact keep behavior**
-- [ ] **Step 2: Write failing tests for downgrade behavior (`max` -> `high`, `xhigh` -> `high` where needed)**
-- [ ] **Step 3: Write failing tests for unsupported-value removal**
-- [ ] **Step 4: Write failing tests for model-family distinctions (Opus vs Sonnet/Haiku, GPT-family variants)**
-- [ ] **Step 5: Implement the pure resolver with explicit capability ladders**
-- [ ] **Step 6: Export the resolver from `src/shared/index.ts`**
-- [ ] **Step 7: Run `bun test src/shared/model-settings-compatibility.test.ts`**
-- [ ] **Step 8: Commit**
+Integrate it first in `chat.params`, then keep any provider-specific effort logic as a thin supplement rather than the policy owner.
 
-### Task 2: Integrate resolver into chat.params
+## Planned Work
 
-**Files:**
-- Modify: `src/plugin/chat-params.ts`
-- Modify: `src/plugin/chat-params.test.ts`
+### 1. Create the shared resolver
 
-- [ ] **Step 1: Write failing tests showing `chat.params` applies resolver output to runtime settings**
-- [ ] **Step 2: Ensure tests cover both `variant` and `reasoningEffort` decisions**
-- [ ] **Step 3: Update `chat-params.ts` to call the shared resolver before hook-specific adjustments**
-- [ ] **Step 4: Preserve existing prompt-param-store merging behavior**
-- [ ] **Step 5: Run `bun test src/plugin/chat-params.test.ts`**
-- [ ] **Step 6: Commit**
+- add a pure compatibility module under `src/shared/`
+- add focused tests for keep, downgrade, and remove behavior
+- export the resolver through the shared module boundary
 
-### Task 3: Re-scope anthropic-effort around the resolver
+### 2. Integrate in `chat.params`
 
-**Files:**
-- Modify: `src/hooks/anthropic-effort/hook.ts`
-- Modify: `src/hooks/anthropic-effort/index.test.ts`
+- apply resolver output to runtime request settings
+- preserve existing merge behavior around stored prompt params
+- cover both `variant` and `reasoningEffort`
 
-- [ ] **Step 1: Write failing tests that codify the intended remaining Anthropic-specific behavior after centralization**
-- [ ] **Step 2: Reduce `anthropic-effort` to Claude/Anthropic-specific effort injection where still needed**
-- [ ] **Step 3: Remove duplicated compatibility policy from the hook if the shared resolver now owns it**
-- [ ] **Step 4: Run `bun test src/hooks/anthropic-effort/index.test.ts`**
-- [ ] **Step 5: Commit**
+### 3. Reduce duplicate hook logic
 
-### Task 4: Add integration/regression coverage across real request paths
+- narrow any provider-specific hook behavior so it supplements the resolver instead of duplicating it
+- remove scattered compatibility logic where the shared resolver now owns the policy
 
-**Files:**
-- Modify: `src/plugin/chat-params.test.ts`
-- Modify: `src/hooks/anthropic-effort/index.test.ts`
-- Add tests only where needed in nearby suites
+### 4. Add regression coverage
 
-- [ ] **Step 1: Add regression test for non-Opus Claude with `variant=max` resolving to compatible settings without ad hoc path-only logic**
-- [ ] **Step 2: Add regression test for GPT-style `reasoningEffort` compatibility**
-- [ ] **Step 3: Add regression test showing supported values remain unchanged**
-- [ ] **Step 4: Run the focused test set**
-- [ ] **Step 5: Commit**
+- keep supported values unchanged
+- downgrade unsupported values to the nearest valid lower setting when possible
+- drop unsupported fields when no compatible value exists
 
-### Task 5: Verify full quality bar
+### 5. Verify quality
 
-**Files:**
-- No intended code changes
+- run focused tests
+- run typecheck if the workspace supports it
+- review diff for compatibility-only scope
 
-- [ ] **Step 1: Run `bun run typecheck`**
-- [ ] **Step 2: Run a focused suite for the touched files**
-- [ ] **Step 3: If clean, run `bun test`**
-- [ ] **Step 4: Review diff for accidental scope creep**
-- [ ] **Step 5: Commit any final cleanup**
+## Non-Goals
 
-### Task 6: Prepare PR metadata
+- model fallback itself
+- automatic model switching
+- widening scope into unrelated request-shaping behavior
 
-**Files:**
-- No repo file change required unless docs are updated further
+## Why This Exists In Docs
 
-- [ ] **Step 1: Write a human summary explaining this is settings compatibility, not model fallback**
-- [ ] **Step 2: Document scope: Phase 1 covers `variant` and `reasoningEffort` only**
-- [ ] **Step 3: Document explicit non-goals: no model switching, no automatic upscaling in Phase 1**
-- [ ] **Step 4: Request review**
+This page is not a user-facing guide. It is an engineering note kept in the tree because the design-agent fork still inherits and depends on the same low-level model-settings compatibility behavior.

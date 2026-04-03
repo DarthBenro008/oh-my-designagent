@@ -11,8 +11,8 @@ import { buildReminderMessage } from "./formatter"
  */
 const TARGET_AGENTS = new Set([
   "sisyphus",
-  "sisyphus-junior",
   "atlas",
+  "hephaestus",
 ])
 
 /**
@@ -79,7 +79,7 @@ export function createCategorySkillReminderHook(
     const agentKey = getAgentConfigKey(agent)
     return (
       TARGET_AGENTS.has(agentKey) ||
-      agentKey.includes("sisyphus") ||
+      (agentKey.includes("sisyphus") && agentKey !== "sisyphus-junior") ||
       agentKey.includes("atlas")
     )
   }
