@@ -1,0 +1,100 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+
+  // Preferred project config for this fork.
+  // Public role mapping:
+  // sisyphus -> Solacy
+  // atlas -> Comment Conductor
+  // hephaestus -> Design Worker
+  // sisyphus-junior -> Canvas Executor
+  // metis -> Comment Planner
+  // momus -> Vision Reviewer
+  // oracle -> Design Auditor
+
+  "default_run_agent": "sisyphus",
+
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-6",
+      "prompt_append": "Act as Solacy. Load docs memory before routing design work, and treat project docs as binding context unless the user explicitly overrides them."
+    },
+
+    "atlas": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "prompt_append": "Act as Comment Conductor. Route non-trivial work through planner, executor, review, and audit. Stop for clarification when scope or target is unclear."
+    },
+
+    "hephaestus": {
+      "model": "openai/gpt-5.4",
+      "reasoningEffort": "high",
+      "prompt_append": "Act as Design Worker. Approach deeper design tasks as product, interaction, and system problems, not only visual edits."
+    },
+
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "temperature": 0.1,
+      "prompt_append": "Act as Canvas Executor. Inspect before mutating, use figma-use for all Figma changes, and keep edits minimal and verifiable."
+    },
+
+    "metis": {
+      "model": "openai/gpt-5.4-mini",
+      "reasoningEffort": "medium",
+      "prompt_append": "Act as Comment Planner. Classify the request, pick the right memory, identify the target scope, and surface uncertainty explicitly."
+    },
+
+    "momus": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high",
+      "prompt_append": "Act as Vision Reviewer. Judge whether the visual result resolves the comment and preserves hierarchy, clarity, and intent."
+    },
+
+    "oracle": {
+      "model": "openai/gpt-5.4",
+      "reasoningEffort": "high",
+      "prompt_append": "Act as Design Auditor. Be strict about variables, spacing, naming, structure, and design-system compliance."
+    },
+
+    "librarian": {
+      "model": "google/gemini-3-flash"
+    },
+
+    "explore": {
+      "model": "github-copilot/grok-code-fast-1"
+    },
+
+    "multimodal-looker": {
+      "model": "google/gemini-3.1-pro"
+    }
+  },
+
+  "design_memory": {
+    "enabled": true,
+    "docs_first": true,
+    "docs_root": "docs",
+    "docs_globs": ["**/*.md", "**/*.mdx", "**/*.jsonc"],
+    "prefer_docs_types": ["design_style", "product_context", "user_behavior"],
+    "auto_load_for_comment_resolution": true,
+    "max_docs_files": 4,
+    "max_chars_per_file": 2400,
+    "max_total_chars": 9600
+  },
+
+  "figma_use": {
+    "enabled": true,
+    "mcp_server_name": "figma-use",
+    "require_status_check": true
+  },
+
+  "figma": {
+    "comment_resolution": {
+      "enabled": true,
+      "auto_reply": true,
+      "max_variants": 3,
+      "require_review_above_difficulty": "medium",
+      "memory_required_for": ["layout_change", "new_component", "design_improvement"]
+    }
+  }
+
+  // Optional hard budget cap:
+  // export OPENCODE_SESSION_BUDGET_USD=0.50
+}

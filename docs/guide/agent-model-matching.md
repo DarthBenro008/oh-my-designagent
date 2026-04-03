@@ -108,6 +108,14 @@ These roles shape most of the behavior in the default comment workflow.
     "hephaestus": {
       "model": "openai/gpt-5.4"
     },
+    "metis": {
+      "model": "openai/gpt-5.4-mini",
+      "reasoningEffort": "medium"
+    },
+    "momus": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high"
+    },
     "sisyphus-junior": {
       "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.1
@@ -119,6 +127,10 @@ These roles shape most of the behavior in the default comment workflow.
   }
 }
 ```
+
+The repo-local example config that uses this mapping is:
+
+- [.opencode/oh-my-opencode.jsonc](/root/oh-my-designagent/.opencode/oh-my-opencode.jsonc)
 
 ## Important Constraint
 

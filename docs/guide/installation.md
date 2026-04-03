@@ -25,8 +25,10 @@ You should also verify that your OpenCode plugin config contains either the cano
 
 Add a project config file if you do not already have one:
 
-- `.opencode/oh-my-openagent.jsonc`
 - `.opencode/oh-my-opencode.jsonc`
+- `.opencode/oh-my-openagent.jsonc`
+
+Use `.opencode/oh-my-opencode.jsonc` as the preferred filename. The `oh-my-openagent` name is compatibility-only.
 
 Recommended minimum:
 
@@ -61,6 +63,22 @@ Recommended minimum:
   }
 }
 ```
+
+This repo now includes a fuller design-agent example at [.opencode/oh-my-opencode.jsonc](/root/oh-my-designagent/.opencode/oh-my-opencode.jsonc).
+
+## Recommended Agent Mapping
+
+Use the internal config keys, but think of them as the design roles:
+
+| Config key | Public role | Recommended model |
+| --- | --- | --- |
+| `sisyphus` | Solacy | `anthropic/claude-opus-4-6` |
+| `atlas` | Comment Conductor | `anthropic/claude-sonnet-4-6` |
+| `hephaestus` | Design Worker | `openai/gpt-5.4` |
+| `sisyphus-junior` | Canvas Executor | `anthropic/claude-sonnet-4-6` |
+| `metis` | Comment Planner | `openai/gpt-5.4-mini` |
+| `momus` | Vision Reviewer | `google/gemini-3.1-pro` |
+| `oracle` | Design Auditor | `openai/gpt-5.4` |
 
 ## Docs Folder Expectations
 
@@ -104,6 +122,39 @@ Pick the providers that fit your preferred design-agent setup. In practice:
 
 See [Agent Model Matching](./agent-model-matching.md) for concrete guidance.
 
+## How To Use It
+
+The usual setup is:
+
+1. Put product, design-system, copy, and user-behavior rules in `docs/`.
+2. Configure `.opencode/oh-my-opencode.jsonc`.
+3. Make sure `figma-use` MCP is reachable.
+4. Open OpenCode and ask the default agent to resolve a Figma comment, or trigger that flow through your own comment transport.
+
+Typical prompts:
+
+- `Resolve the latest comment on the checkout CTA in Figma.`
+- `Review this Figma comment, load docs context first, and only patch the target node if confidence is high.`
+- `Use the design-agent flow to fix the spacing and copy issues called out in the selected frame.`
+
+The expected execution path is:
+
+1. Solacy receives the task.
+2. Docs memory loads from `docs/`.
+3. Comment Planner classifies the request.
+4. Canvas Executor performs the Figma mutation through `figma-use`.
+5. Vision Reviewer and Design Auditor verify the result.
+
+## Optional Spend Limit
+
+If you want all work to stop once a USD budget is exceeded, set:
+
+```bash
+export OPENCODE_SESSION_BUDGET_USD=0.50
+```
+
+If the variable is not set, no spend limit is enforced.
+
 ## After Install
 
 Once installed:
@@ -127,6 +178,7 @@ Then the default design flow becomes:
 - Package and CLI name remain `oh-my-opencode`
 - Runtime compatibility still recognizes legacy naming in config and plugin registration
 - Internal agent keys such as `sisyphus` and `atlas` remain in config even though their public roles are now Solacy and Comment Conductor
+- `.opencode/oh-my-opencode.jsonc` is the preferred project config filename
 
 For the current runtime behavior, read:
 

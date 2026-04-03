@@ -8,10 +8,10 @@ The package and CLI still use the `oh-my-opencode` name. Config continues to loa
 
 Project config:
 
-- `.opencode/oh-my-openagent.json`
-- `.opencode/oh-my-openagent.jsonc`
 - `.opencode/oh-my-opencode.json`
 - `.opencode/oh-my-opencode.jsonc`
+- `.opencode/oh-my-openagent.json`
+- `.opencode/oh-my-openagent.jsonc`
 
 User config:
 
@@ -21,6 +21,10 @@ User config:
 - `~/.config/opencode/oh-my-opencode.jsonc`
 
 JSONC is recommended.
+
+Preferred project filename:
+
+- `.opencode/oh-my-opencode.jsonc`
 
 ## Minimal Design Setup
 
@@ -163,7 +167,25 @@ Example:
 }
 ```
 
+The repo includes a fuller example at [.opencode/oh-my-opencode.jsonc](/root/oh-my-designagent/.opencode/oh-my-opencode.jsonc).
+
 Legacy user-facing names such as `solacy`, `comment-conductor`, `design-worker`, and `canvas-executor` are migrated onto those internal keys by the runtime.
+
+## Environment Variables
+
+### `OPENCODE_SESSION_BUDGET_USD`
+
+Optional hard spend cap for the whole root session tree.
+
+- if unset: disabled
+- if empty, invalid, zero, or negative: disabled
+- if positive: aborts work once cumulative reported cost exceeds the limit
+
+Example:
+
+```bash
+export OPENCODE_SESSION_BUDGET_USD=0.50
+```
 
 ## Relevant Hooks
 

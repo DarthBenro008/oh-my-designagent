@@ -8,6 +8,7 @@ This fork replaces the old coding-first execution backbone with a design-first a
 - uses the existing plugin context injection pipeline for memory
 - treats `figma-use` MCP as the Figma Plugin API execution surface
 - routes comment work through planning, execution, visual review, and design audit
+- can hard-stop all work when `OPENCODE_SESSION_BUDGET_USD` is exceeded
 
 The package and CLI name remain `oh-my-opencode`, but the runtime behavior in this fork is centered on design work rather than general coding automation.
 
@@ -72,6 +73,12 @@ If memory conflicts with the obvious visual tweak, the system should surface the
 
 ## Quick Config
 
+Preferred project config path:
+
+- `.opencode/oh-my-opencode.jsonc`
+
+Compatibility paths such as `.opencode/oh-my-openagent.jsonc` are still accepted, but `oh-my-opencode.jsonc` should be your default.
+
 ```jsonc
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
@@ -113,6 +120,33 @@ If memory conflicts with the obvious visual tweak, the system should surface the
 }
 ```
 
+A ready-to-use project config with the full design-agent model mapping is included at [.opencode/oh-my-opencode.jsonc](/root/oh-my-designagent/.opencode/oh-my-opencode.jsonc).
+
+## Install And Use
+
+Install the plugin:
+
+```bash
+bunx oh-my-opencode install
+```
+
+Then add or adapt your project config at `.opencode/oh-my-opencode.jsonc`, make sure your repo has a useful `docs/` folder, and enable `figma-use`.
+
+Typical workflow:
+
+1. Start OpenCode with this plugin enabled.
+2. Point `figma_use` at your `figma-use` MCP server.
+3. Ask Solacy to resolve a Figma comment or run the flow through your comment transport.
+4. The system loads relevant docs memory, plans the fix, mutates Figma, then reviews and audits it.
+
+Optional hard budget cap:
+
+```bash
+export OPENCODE_SESSION_BUDGET_USD=0.50
+```
+
+If the total root session tree spends more than that amount, the plugin aborts the session and reports that the budget was exceeded.
+
 ## Relevant Hooks
 
 The key runtime path for this fork is:
@@ -126,7 +160,9 @@ This gives design agents proactive memory loading from `docs/` before they start
 ## Documentation
 
 - [Overview](docs/guide/overview.md)
+- [Installation](docs/guide/installation.md)
 - [Orchestration](docs/guide/orchestration.md)
+- [Agent Model Matching](docs/guide/agent-model-matching.md)
 - [Configuration](docs/reference/configuration.md)
 - [Features](docs/reference/features.md)
 - [Design Agents and Hooks](docs/reference/design-agents.md)

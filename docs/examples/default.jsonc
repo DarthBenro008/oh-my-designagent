@@ -25,11 +25,15 @@
 
     // Comment Planner
     "metis": {
+      "model": "openai/gpt-5.4-mini",
+      "reasoningEffort": "medium",
       "prompt_append": "Classify requests clearly and stop for clarification when context conflicts."
     },
 
     // Vision Reviewer
     "momus": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high",
       "prompt_append": "Judge whether the visual result actually resolves the comment."
     },
 
@@ -78,6 +82,9 @@
       "memory_required_for": ["new_component", "layout_change", "design_improvement"]
     }
   },
+
+  // Optional hard budget cap:
+  // export OPENCODE_SESSION_BUDGET_USD=0.50
 
   "background_task": {
     "providerConcurrency": {
