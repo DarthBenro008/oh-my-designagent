@@ -30,6 +30,35 @@ export interface DesignMemoryPacket {
   files: LoadedDesignMemoryFile[]
 }
 
+interface DocsInventoryFile {
+  resolvedPath: string
+  relativePath: string
+  type: DesignMemoryFileType
+}
+
+interface DirectoryStamp {
+  path: string
+  mtimeMs: number
+}
+
+interface DocsInventoryCacheEntry {
+  docsRoot: string
+  rootExists: boolean
+  version: number
+  directories: DirectoryStamp[]
+  files: DocsInventoryFile[]
+}
+
+interface FileContentCacheEntry {
+  signature: string
+  raw: string
+}
+
+interface PacketCacheEntry {
+  packet: DesignMemoryPacket
+  fileSignatures: Record<string, string>
+}
+
 const PATH_TOKEN_SPLIT = /[^a-z0-9]+/i
 const DOCS_PRIORITY_BY_TYPE: Record<DesignMemoryFileType, number> = {
   design_style: 84,
@@ -39,6 +68,10 @@ const DOCS_PRIORITY_BY_TYPE: Record<DesignMemoryFileType, number> = {
   historical_learnings: 70,
   custom: 64,
 }
+const docsInventoryCache = new Map<string, DocsInventoryCacheEntry>()
+const fileContentCache = new Map<string, FileContentCacheEntry>()
+const designMemoryPacketCache = new Map<string, PacketCacheEntry>()
+let docsInventoryVersionCounter = 0
 
 function resolveMemoryPath(directory: string, filePath: string): string {
   if (path.isAbsolute(filePath)) {
@@ -59,6 +92,27 @@ function truncateContent(content: string, maxChars: number): string {
   }
 
   return `${content.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`
+}
+
+function getFileSignature(filePath: string): string | null {
+  try {
+    const stat = fs.statSync(filePath)
+    return `${stat.mtimeMs}:${stat.size}`
+  } catch {
+    return null
+  }
+}
+
+function getDirectoryStamp(directory: string): DirectoryStamp | null {
+  try {
+    const stat = fs.statSync(directory)
+    return {
+      path: directory,
+      mtimeMs: stat.mtimeMs,
+    }
+  } catch {
+    return null
+  }
 }
 
 function toRelativePath(directory: string, resolvedPath: string): string {
@@ -135,27 +189,209 @@ function matchesDocsGlobs(relativePath: string, globs: string[]): boolean {
   return globs.some((glob) => globToRegExp(glob).test(normalizedPath))
 }
 
-function collectFilePaths(directory: string): string[] {
-  if (!fs.existsSync(directory)) {
-    return []
-  }
-
-  const entries = fs.readdirSync(directory, { withFileTypes: true })
-  const filePaths: string[] = []
-
-  for (const entry of entries) {
-    const resolvedPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      filePaths.push(...collectFilePaths(resolvedPath))
-      continue
-    }
-
-    if (entry.isFile()) {
-      filePaths.push(resolvedPath)
+function collectDocsTree(args: {
+  docsRoot: string
+  directory: string
+  globs: string[]
+}): Pick<DocsInventoryCacheEntry, "rootExists" | "directories" | "files"> {
+  const { docsRoot, directory, globs } = args
+  if (!fs.existsSync(docsRoot)) {
+    return {
+      rootExists: false,
+      directories: [],
+      files: [],
     }
   }
 
-  return filePaths
+  const directories: DirectoryStamp[] = []
+  const files: DocsInventoryFile[] = []
+
+  const traverse = (currentDir: string): void => {
+    const directoryStamp = getDirectoryStamp(currentDir)
+    if (!directoryStamp) {
+      return
+    }
+
+    directories.push(directoryStamp)
+
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true })
+    for (const entry of entries) {
+      const resolvedPath = path.join(currentDir, entry.name)
+      if (entry.isDirectory()) {
+        traverse(resolvedPath)
+        continue
+      }
+
+      if (!entry.isFile()) {
+        continue
+      }
+
+      const relativePath = toRelativePath(directory, resolvedPath)
+      if (!matchesDocsGlobs(relativePath, globs)) {
+        continue
+      }
+
+      files.push({
+        resolvedPath,
+        relativePath,
+        type: inferDocsType(relativePath),
+      })
+    }
+  }
+
+  traverse(docsRoot)
+
+  return {
+    rootExists: true,
+    directories,
+    files,
+  }
+}
+
+function normalizePromptBucket(prompt?: string): string {
+  const tokens = [...new Set(tokenize(prompt ?? ""))].sort()
+  return tokens.join("|")
+}
+
+function serializeDesignMemoryFiles(files: DesignMemoryFile[]): string {
+  return JSON.stringify(files.map((file) => ({
+    path: file.path,
+    type: file.type,
+    priority: file.priority,
+    tags: [...file.tags],
+    max_chars: file.max_chars,
+    required: file.required,
+  })))
+}
+
+function createDocsInventoryCacheKey(args: {
+  directory: string
+  config: DesignMemoryConfig
+}): string {
+  return JSON.stringify({
+    directory: path.resolve(args.directory),
+    docsRoot: args.config.docs_root,
+    docsGlobs: [...args.config.docs_globs],
+  })
+}
+
+function isDocsInventoryCacheEntryValid(entry: DocsInventoryCacheEntry): boolean {
+  if (!entry.rootExists) {
+    return !fs.existsSync(entry.docsRoot)
+  }
+
+  for (const directory of entry.directories) {
+    const currentStamp = getDirectoryStamp(directory.path)
+    if (!currentStamp || currentStamp.mtimeMs !== directory.mtimeMs) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function getDocsInventory(args: {
+  directory: string
+  config: DesignMemoryConfig
+}): DocsInventoryCacheEntry {
+  const key = createDocsInventoryCacheKey(args)
+  const cached = docsInventoryCache.get(key)
+  if (cached && isDocsInventoryCacheEntryValid(cached)) {
+    return cached
+  }
+
+  const docsRoot = resolveMemoryPath(args.directory, args.config.docs_root)
+  const tree = collectDocsTree({
+    docsRoot,
+    directory: args.directory,
+    globs: args.config.docs_globs,
+  })
+  const entry: DocsInventoryCacheEntry = {
+    docsRoot,
+    rootExists: tree.rootExists,
+    version: ++docsInventoryVersionCounter,
+    directories: tree.directories,
+    files: tree.files,
+  }
+  docsInventoryCache.set(key, entry)
+  return entry
+}
+
+function readCachedFileContent(resolvedPath: string): string | null {
+  const signature = getFileSignature(resolvedPath)
+  if (!signature) {
+    return null
+  }
+
+  const cached = fileContentCache.get(resolvedPath)
+  if (cached?.signature === signature) {
+    return cached.raw
+  }
+
+  try {
+    const raw = fs.readFileSync(resolvedPath, "utf-8").trim()
+    fileContentCache.set(resolvedPath, {
+      signature,
+      raw,
+    })
+    return raw
+  } catch {
+    return null
+  }
+}
+
+function cloneLoadedDesignMemoryFile(
+  loaded: LoadedDesignMemoryFile,
+): LoadedDesignMemoryFile {
+  return {
+    ...loaded,
+    file: {
+      ...loaded.file,
+      tags: [...loaded.file.tags],
+    },
+  }
+}
+
+function cloneDesignMemoryPacket(packet: DesignMemoryPacket): DesignMemoryPacket {
+  return {
+    summary: packet.summary,
+    files: packet.files.map(cloneLoadedDesignMemoryFile),
+  }
+}
+
+function createPacketCacheKey(args: {
+  directory: string
+  config: DesignMemoryConfig
+  promptBucket: string
+  docsInventoryVersion: number
+}): string {
+  return JSON.stringify({
+    directory: path.resolve(args.directory),
+    docsInventoryVersion: args.docsInventoryVersion,
+    promptBucket: args.promptBucket,
+    docsFirst: args.config.docs_first,
+    preferDocsTypes: [...args.config.prefer_docs_types],
+    maxDocsFiles: args.config.max_docs_files,
+    maxCharsPerFile: args.config.max_chars_per_file,
+    maxTotalChars: args.config.max_total_chars,
+    files: serializeDesignMemoryFiles(args.config.files),
+  })
+}
+
+function getCachedPacket(cacheKey: string): DesignMemoryPacket | null {
+  const cached = designMemoryPacketCache.get(cacheKey)
+  if (!cached) {
+    return null
+  }
+
+  for (const [resolvedPath, signature] of Object.entries(cached.fileSignatures)) {
+    if (getFileSignature(resolvedPath) !== signature) {
+      designMemoryPacketCache.delete(cacheKey)
+      return null
+    }
+  }
+
+  return cloneDesignMemoryPacket(cached.packet)
 }
 
 function scoreDocsCandidate(args: {
@@ -211,41 +447,29 @@ function scoreDocsCandidate(args: {
 }
 
 function createDocsCandidates(args: {
-  directory: string
   config: DesignMemoryConfig
+  docsInventory: DocsInventoryCacheEntry
   prompt?: string
 }): DesignMemoryCandidate[] {
-  const docsRoot = resolveMemoryPath(args.directory, args.config.docs_root)
-  const filePaths = collectFilePaths(docsRoot)
-
-  const candidates = filePaths
-    .map((resolvedPath) => {
-      const relativePath = toRelativePath(args.directory, resolvedPath)
-      if (!matchesDocsGlobs(relativePath, args.config.docs_globs)) {
-        return null
-      }
-
-      const type = inferDocsType(relativePath)
-      return {
-        file: {
-          path: relativePath,
-          type,
-          priority: scoreDocsCandidate({
-            relativePath,
-            type,
-            prompt: args.prompt,
-            preferDocsTypes: args.config.prefer_docs_types,
-          }),
-          tags: [],
-          required: false,
-        },
-        resolvedPath,
-        relativePath,
-        source: "docs" as const,
-        score: 0,
-      }
-    })
-    .filter((candidate): candidate is DesignMemoryCandidate => candidate !== null)
+  const candidates = args.docsInventory.files
+    .map((file) => ({
+      file: {
+        path: file.relativePath,
+        type: file.type,
+        priority: scoreDocsCandidate({
+          relativePath: file.relativePath,
+          type: file.type,
+          prompt: args.prompt,
+          preferDocsTypes: args.config.prefer_docs_types,
+        }),
+        tags: [],
+        required: false,
+      },
+      resolvedPath: file.resolvedPath,
+      relativePath: file.relativePath,
+      source: "docs" as const,
+      score: 0,
+    }))
     .map((candidate) => ({
       ...candidate,
       score: candidate.file.priority,
@@ -307,8 +531,23 @@ export function loadDesignMemoryPacket(args: {
     return { summary: "", files: [] }
   }
 
-  const docsCandidates = config.docs_first
-    ? createDocsCandidates({ directory, config, prompt })
+  const promptBucket = normalizePromptBucket(prompt)
+  const docsInventory = config.docs_first
+    ? getDocsInventory({ directory, config })
+    : null
+  const packetCacheKey = createPacketCacheKey({
+    directory,
+    config,
+    promptBucket,
+    docsInventoryVersion: docsInventory?.version ?? 0,
+  })
+  const cachedPacket = getCachedPacket(packetCacheKey)
+  if (cachedPacket) {
+    return cachedPacket
+  }
+
+  const docsCandidates = docsInventory
+    ? createDocsCandidates({ config, docsInventory, prompt })
     : []
   const configuredCandidates = createConfiguredCandidates({ directory, config })
 
@@ -332,7 +571,7 @@ export function loadDesignMemoryPacket(args: {
     }
 
     try {
-      const raw = fs.readFileSync(candidate.resolvedPath, "utf-8").trim()
+      const raw = readCachedFileContent(candidate.resolvedPath)
       if (!raw) {
         continue
       }
@@ -358,8 +597,37 @@ export function loadDesignMemoryPacket(args: {
     }
   }
 
-  return {
+  const packet = {
     summary: formatSummary(loaded),
     files: loaded,
+  }
+  designMemoryPacketCache.set(packetCacheKey, {
+    packet: cloneDesignMemoryPacket(packet),
+    fileSignatures: Object.fromEntries(
+      packet.files
+        .map((file) => [file.resolvedPath, getFileSignature(file.resolvedPath)])
+        .filter((entry): entry is [string, string] => entry[1] !== null),
+    ),
+  })
+
+  return packet
+}
+
+export function _resetDesignMemoryCacheForTesting(): void {
+  docsInventoryCache.clear()
+  fileContentCache.clear()
+  designMemoryPacketCache.clear()
+  docsInventoryVersionCounter = 0
+}
+
+export function _getDesignMemoryCacheStatsForTesting(): {
+  docsInventoryEntries: number
+  fileContentEntries: number
+  packetEntries: number
+} {
+  return {
+    docsInventoryEntries: docsInventoryCache.size,
+    fileContentEntries: fileContentCache.size,
+    packetEntries: designMemoryPacketCache.size,
   }
 }

@@ -209,7 +209,7 @@ export function createCommentPlannerAgent(ctx: DesignAgentContext): AgentConfig 
     "call_omo_agent",
   ])
 
-  return {
+  const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
     model: ctx.model,
     color: "#7C3AED",
@@ -237,7 +237,10 @@ Output requirements:
 - whether clarification is required
 
 Do not mutate files or the canvas. Planning only.`,
+    skills: maybeSkillList(ctx.figmaUseEnabled),
   }
+
+  return config
 }
 
 export function createVisionReviewerAgent(ctx: DesignAgentContext): AgentConfig {
@@ -275,7 +278,7 @@ export function createDesignAuditorAgent(ctx: DesignAgentContext): AgentConfig {
     "call_omo_agent",
   ])
 
-  return {
+  const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
     model: ctx.model,
     color: "#0EA5E9",
@@ -298,7 +301,10 @@ Audit for:
 
 Return specific findings and the smallest corrective action for each.
 Do not mutate the canvas yourself.`,
+    skills: maybeSkillList(ctx.figmaUseEnabled),
   }
+
+  return config
 }
 
 export function createCanvasExecutorAgent(args: {

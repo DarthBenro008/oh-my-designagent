@@ -2,12 +2,17 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import { loadDesignMemoryPacket } from "./design-memory"
+import {
+  _getDesignMemoryCacheStatsForTesting,
+  _resetDesignMemoryCacheForTesting,
+  loadDesignMemoryPacket,
+} from "./design-memory"
 
 describe("loadDesignMemoryPacket", () => {
   let testDir = ""
 
   afterEach(() => {
+    _resetDesignMemoryCacheForTesting()
     if (testDir) {
       rmSync(testDir, { recursive: true, force: true })
       testDir = ""
@@ -115,5 +120,79 @@ describe("loadDesignMemoryPacket", () => {
 
     expect(packet.files).toHaveLength(0)
     expect(packet.summary).toBe("")
+  })
+
+  test("reuses cached packet for prompts with the same token bucket", () => {
+    testDir = mkdtempSync(join(tmpdir(), "design-memory-cache-"))
+    mkdirSync(join(testDir, "docs"), { recursive: true })
+    writeFileSync(join(testDir, "docs", "design-rules.md"), "spacing typography comment figma ".repeat(20))
+
+    const config = {
+      enabled: true,
+      docs_first: true,
+      docs_root: "docs",
+      docs_globs: ["**/*.md"],
+      prefer_docs_types: ["design_style"],
+      auto_load_for_comment_resolution: true,
+      max_docs_files: 2,
+      files: [],
+      max_chars_per_file: 120,
+      max_total_chars: 240,
+    }
+
+    const firstPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Resolve figma spacing comment",
+      config,
+    })
+    const firstStats = _getDesignMemoryCacheStatsForTesting()
+
+    const secondPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "comment spacing resolve figma",
+      config,
+    })
+    const secondStats = _getDesignMemoryCacheStatsForTesting()
+
+    expect(firstPacket.summary).toBe(secondPacket.summary)
+    expect(secondStats.docsInventoryEntries).toBe(firstStats.docsInventoryEntries)
+    expect(secondStats.packetEntries).toBe(firstStats.packetEntries)
+  })
+
+  test("invalidates cached docs packet when the docs tree changes", async () => {
+    testDir = mkdtempSync(join(tmpdir(), "design-memory-invalidation-"))
+    mkdirSync(join(testDir, "docs", "guide"), { recursive: true })
+    writeFileSync(join(testDir, "docs", "guide", "layout.md"), "layout system ".repeat(20))
+
+    const config = {
+      enabled: true,
+      docs_first: true,
+      docs_root: "docs",
+      docs_globs: ["**/*.md"],
+      prefer_docs_types: [],
+      auto_load_for_comment_resolution: true,
+      max_docs_files: 1,
+      files: [],
+      max_chars_per_file: 160,
+      max_total_chars: 320,
+    }
+
+    const initialPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Resolve layout comment",
+      config,
+    })
+    expect(initialPacket.files[0]?.relativePath).toBe("docs/guide/layout.md")
+
+    await Bun.sleep(5)
+    writeFileSync(join(testDir, "docs", "guide", "comment-rules.md"), "comment layout rules ".repeat(20))
+
+    const updatedPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Resolve layout comment",
+      config,
+    })
+
+    expect(updatedPacket.files[0]?.relativePath).toBe("docs/guide/comment-rules.md")
   })
 })
