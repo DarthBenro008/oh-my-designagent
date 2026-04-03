@@ -11,6 +11,7 @@ import {
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
   createAgentUsageReminderHook,
+  createBudgetEnforcerHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
   createRalphLoopHook,
@@ -34,6 +35,7 @@ import {
   log,
   normalizeSDKResponse,
 } from "../../shared"
+import { getSessionBudgetLimitUsd } from "../../shared/session-budget"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
 
@@ -47,6 +49,7 @@ export type SessionHooks = {
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
+  budgetEnforcer: ReturnType<typeof createBudgetEnforcerHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
   ralphLoop: ReturnType<typeof createRalphLoopHook> | null
@@ -194,6 +197,11 @@ export function createSessionHooks(args: {
     ? safeHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx))
     : null
 
+  const budgetEnforcer =
+    isHookEnabled("budget-enforcer") && getSessionBudgetLimitUsd() !== null
+      ? safeHook("budget-enforcer", () => createBudgetEnforcerHook(ctx))
+      : null
+
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
     ? safeHook("non-interactive-env", () => createNonInteractiveEnvHook(ctx))
     : null
@@ -279,6 +287,7 @@ export function createSessionHooks(args: {
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
     agentUsageReminder,
+    budgetEnforcer,
     nonInteractiveEnv,
     interactiveBashSession,
     ralphLoop,

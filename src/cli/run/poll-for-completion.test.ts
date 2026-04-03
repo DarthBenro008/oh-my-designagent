@@ -1,7 +1,32 @@
 import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
-import { createEventState } from "./events"
-import { pollForCompletion } from "./poll-for-completion"
+
+mock.module("picocolors", () => ({
+  default: {
+    red: (value: string) => value,
+    yellow: (value: string) => value,
+    green: (value: string) => value,
+  },
+}))
+
+mock.module("../../shared", () => ({
+  normalizeSDKResponse: (response: { data?: unknown }, fallback: unknown) =>
+    response?.data ?? fallback,
+}))
+
+mock.module("./continuation-state", () => ({
+  getContinuationState: () => ({
+    hasActiveBoulder: false,
+    hasActiveRalphLoop: false,
+    hasHookMarker: false,
+    hasTodoHookMarker: false,
+    hasActiveHookMarker: false,
+    activeHookMarkerReason: null,
+  }),
+}))
+
+const { createEventState } = await import("./events")
+const { pollForCompletion } = await import("./poll-for-completion")
 
 const createMockContext = (overrides: {
   todo?: Todo[]
@@ -171,6 +196,21 @@ describe("pollForCompletion", () => {
     })
 
     //#then
+    expect(result).toBe(1)
+  })
+
+  it("returns 1 immediately when the session budget is exceeded", async () => {
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.budgetExceededMessage =
+      "Budget exceeded: spent $0.5500 over limit $0.5000. Session aborted."
+    const abortController = new AbortController()
+
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+    })
+
     expect(result).toBe(1)
   })
 

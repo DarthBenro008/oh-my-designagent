@@ -21,6 +21,7 @@ export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
+export { createBudgetEnforcerHook } from "./budget-enforcer";
 export { createKeywordDetectorHook } from "./keyword-detector";
 export { createDocsMemoryPreloaderHook } from "./docs-memory-preloader";
 export { createNonInteractiveEnvHook } from "./non-interactive-env";

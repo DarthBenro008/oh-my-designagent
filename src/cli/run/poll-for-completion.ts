@@ -50,6 +50,11 @@ export async function pollForCompletion(
       return 130
     }
 
+    if (eventState.budgetExceededMessage) {
+      console.error(pc.red(`\n\n${eventState.budgetExceededMessage}`))
+      return 1
+    }
+
     // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
       errorCycleCount++

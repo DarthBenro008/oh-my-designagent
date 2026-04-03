@@ -1,9 +1,29 @@
-import { afterEach, beforeEach, describe, it, expect, spyOn } from "bun:test"
-import { createEventState, processEvents, serializeError, type EventState } from "./events"
+import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, EventPayload } from "./types"
+import {
+  _resetSessionBudgetStateForTesting,
+  SESSION_BUDGET_ENV_VAR,
+} from "../../shared/session-budget"
+
+mock.module("picocolors", () => ({
+  default: {
+    red: (value: string) => value,
+    green: (value: string) => value,
+    yellow: (value: string) => value,
+    dim: (value: string) => value,
+    cyan: (value: string) => value,
+    bold: (value: string) => value,
+  },
+}))
+
+const { createEventState, processEvents, serializeError } = await import("./events")
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
-  client: {} as RunContext["client"],
+  client: {
+    session: {
+      abort: mock(() => Promise.resolve({})),
+    },
+  } as unknown as RunContext["client"],
   sessionID,
   directory: "/test",
   abortController: new AbortController(),
@@ -14,6 +34,8 @@ async function* toAsyncIterable<T>(items: T[]): AsyncIterable<T> {
     yield item
   }
 }
+
+const originalBudgetEnv = process.env[SESSION_BUDGET_ENV_VAR]
 
 describe("serializeError", () => {
   it("returns 'Unknown error' for null/undefined", () => {
@@ -70,6 +92,15 @@ describe("serializeError", () => {
     expect(result).toContain("ERR_001")
     expect(result).toContain("500")
   })
+})
+
+afterEach(() => {
+  _resetSessionBudgetStateForTesting()
+  if (originalBudgetEnv === undefined) {
+    delete process.env[SESSION_BUDGET_ENV_VAR]
+  } else {
+    process.env[SESSION_BUDGET_ENV_VAR] = originalBudgetEnv
+  }
 })
 
 describe("createEventState", () => {
@@ -314,10 +345,57 @@ describe("event handling", () => {
     expect(state.hasReceivedMeaningfulWork).toBe(false)
   })
 
+  it("aborts the run session tree and records a budget-exceeded message", async () => {
+    process.env[SESSION_BUDGET_ENV_VAR] = "0.50"
+
+    const ctx = createMockContext("ses_root")
+    const state = createEventState()
+    const events = toAsyncIterable<EventPayload>([
+      {
+        type: "session.created",
+        properties: {
+          info: { id: "ses_child", parentID: "ses_root" },
+        },
+      },
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_root",
+            sessionID: "ses_root",
+            role: "assistant",
+            cost: 0.30,
+          },
+        },
+      },
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_child",
+            sessionID: "ses_child",
+            role: "assistant",
+            cost: 0.25,
+          },
+        },
+      },
+    ])
+
+    await processEvents(ctx, events, state)
+
+    expect((ctx.client.session.abort as ReturnType<typeof mock>).mock.calls).toEqual([
+      [{ path: { id: "ses_child" } }],
+      [{ path: { id: "ses_root" } }],
+    ])
+    expect(state.budgetExceededMessage).toBe(
+      "Budget exceeded: spent $0.5500 over limit $0.5000. Session aborted.",
+    )
+  })
+
   it("session.status with busy type sets mainSessionIdle to false", async () => {
     // given
     const ctx = createMockContext("my-session")
-    const state: EventState = {
+    const state = {
       ...createEventState(),
       mainSessionIdle: true,
     }

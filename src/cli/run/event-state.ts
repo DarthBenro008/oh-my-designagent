@@ -45,6 +45,12 @@ export interface EventState {
   messageStartedAtById: Record<string, number>
   /** Prevent duplicate completion metadata lines per message */
   completionMetaPrintedByMessageId: Record<string, boolean>
+  /** Set when a spend cap aborts the session tree */
+  budgetExceededMessage: string | null
+  /** Spend observed when the budget cap was exceeded */
+  budgetSpentUsd: number | null
+  /** Limit that was exceeded */
+  budgetLimitUsd: number | null
 }
 
 export function createEventState(): EventState {
@@ -75,5 +81,8 @@ export function createEventState(): EventState {
     currentMessageId: null,
     messageStartedAtById: {},
     completionMetaPrintedByMessageId: {},
+    budgetExceededMessage: null,
+    budgetSpentUsd: null,
+    budgetLimitUsd: null,
   }
 }

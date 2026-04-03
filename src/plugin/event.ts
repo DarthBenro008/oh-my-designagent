@@ -251,6 +251,7 @@ export function createEventHandler(args: {
     );
     await runEventHookSafely("runtimeFallback", hooks.runtimeFallback?.event, input);
     await runEventHookSafely("agentUsageReminder", hooks.agentUsageReminder?.event, input);
+    await runEventHookSafely("budgetEnforcer", hooks.budgetEnforcer?.event, input);
     await runEventHookSafely("categorySkillReminder", hooks.categorySkillReminder?.event, input);
     await runEventHookSafely("interactiveBashSession", hooks.interactiveBashSession?.event, input as EventInput);
     await runEventHookSafely("ralphLoop", hooks.ralphLoop?.event, input);

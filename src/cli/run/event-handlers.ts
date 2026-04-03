@@ -2,6 +2,7 @@ import pc from "picocolors"
 import type {
   RunContext,
   EventPayload,
+  SessionCreatedProps,
   SessionIdleProps,
   SessionStatusProps,
   SessionErrorProps,
@@ -13,6 +14,12 @@ import type {
   TuiToastShowProps,
 } from "./types"
 import type { EventState } from "./event-state"
+import {
+  clearSessionBudgetSession,
+  getSessionBudgetExceededMessage,
+  recordSessionBudgetCost,
+  registerSessionBudgetSession,
+} from "../../shared/session-budget"
 import { serializeError } from "./event-formatting"
 import { formatToolHeader } from "./tool-input-preview"
 import { displayChars } from "./display-chars"
@@ -272,6 +279,57 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
     state.currentModel = model
     state.currentVariant = variant
     renderAgentHeader(agent, model, variant, state.agentColorsByName)
+  }
+}
+
+export async function handleBudgetEvent(
+  ctx: RunContext,
+  payload: EventPayload,
+  state: EventState,
+): Promise<void> {
+  if (payload.type === "session.created") {
+    const props = payload.properties as SessionCreatedProps | undefined
+    const sessionID = props?.info?.id
+    if (sessionID) {
+      registerSessionBudgetSession(sessionID, props?.info?.parentID)
+    }
+    return
+  }
+
+  if (payload.type === "session.deleted") {
+    const props = payload.properties as { info?: { id?: string } } | undefined
+    const sessionID = props?.info?.id
+    if (sessionID) {
+      clearSessionBudgetSession(sessionID)
+    }
+    return
+  }
+
+  if (payload.type !== "message.updated") return
+
+  const props = payload.properties as MessageUpdatedProps | undefined
+  const sessionID = getInfoSessionId(props)
+  const messageID = props?.info?.id
+  const role = props?.info?.role
+  const cost = props?.info?.cost
+
+  if (!sessionID || role !== "assistant" || typeof messageID !== "string" || typeof cost !== "number") {
+    return
+  }
+
+  const outcome = recordSessionBudgetCost({
+    sessionID,
+    messageID,
+    costUsd: cost,
+  })
+  if (!outcome?.firstExceeded) return
+
+  state.budgetExceededMessage = getSessionBudgetExceededMessage(outcome.totalUsd, outcome.limitUsd)
+  state.budgetSpentUsd = outcome.totalUsd
+  state.budgetLimitUsd = outcome.limitUsd
+
+  for (const abortSessionID of outcome.abortSessionIDs) {
+    await ctx.client.session.abort({ path: { id: abortSessionID } }).catch(() => {})
   }
 }
 

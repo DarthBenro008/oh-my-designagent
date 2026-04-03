@@ -9,6 +9,7 @@ import {
   handleMessagePartUpdated,
   handleMessagePartDelta,
   handleMessageUpdated,
+  handleBudgetEvent,
   handleToolExecute,
   handleToolResult,
   handleTuiToast,
@@ -44,6 +45,7 @@ export async function processEvents(
       handleMessagePartUpdated(ctx, payload, state)
       handleMessagePartDelta(ctx, payload, state)
       handleMessageUpdated(ctx, payload, state)
+      await handleBudgetEvent(ctx, payload, state)
       handleToolExecute(ctx, payload, state)
       handleToolResult(ctx, payload, state)
       handleTuiToast(ctx, payload, state)

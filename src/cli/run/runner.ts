@@ -133,12 +133,15 @@ export async function run(options: RunOptions): Promise<number> {
       }
 
       if (jsonManager) {
+        const summary =
+          (eventState.budgetExceededMessage ?? eventState.lastPartText.slice(0, 200))
+          || "Run completed"
         jsonManager.emitResult({
           sessionId: sessionID,
           success: exitCode === 0,
           durationMs,
           messageCount: eventState.messageCount,
-          summary: eventState.lastPartText.slice(0, 200) || "Run completed",
+          summary,
         })
       }
 

@@ -77,6 +77,14 @@ export interface MessageUpdatedProps {
     providerID?: string
     agent?: string
     variant?: string
+    cost?: number
+  }
+}
+
+export interface SessionCreatedProps {
+  info?: {
+    id?: string
+    parentID?: string
   }
 }
 
