@@ -13,6 +13,7 @@ export * from "./schema/experimental";
 export * from "./schema/fallback-models";
 export * from "./schema/figma";
 export * from "./schema/figma-use";
+export * from "./schema/design-pipeline";
 export * from "./schema/git-env-prefix";
 export * from "./schema/git-master";
 export * from "./schema/hooks";

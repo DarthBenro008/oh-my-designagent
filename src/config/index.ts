@@ -17,6 +17,7 @@ export type {
   FigmaConfig,
   FigmaUseConfig,
   FigmaUseMode,
+  DesignPipelineConfig,
   TmuxConfig,
   TmuxLayout,
   SisyphusConfig,

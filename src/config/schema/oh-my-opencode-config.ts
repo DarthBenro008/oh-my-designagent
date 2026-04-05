@@ -13,6 +13,7 @@ import { BuiltinCommandNameSchema } from "./commands";
 import { ExperimentalConfigSchema } from "./experimental";
 import { FigmaConfigSchema } from "./figma";
 import { FigmaUseConfigSchema } from "./figma-use";
+import { DesignPipelineConfigSchema } from "./design-pipeline";
 import { GitMasterConfigSchema } from "./git-master";
 import { NotificationConfigSchema } from "./notification";
 import { OpenClawConfigSchema } from "./openclaw";
@@ -53,6 +54,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   experimental: ExperimentalConfigSchema.optional(),
   figma: FigmaConfigSchema.optional(),
   figma_use: FigmaUseConfigSchema.optional(),
+  pipeline: DesignPipelineConfigSchema.optional(),
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
