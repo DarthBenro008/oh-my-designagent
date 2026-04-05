@@ -1,30 +1,35 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
 import type {
   AvailableAgent,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder"
-import { categorizeTools } from "./dynamic-agent-prompt-builder"
-import { createAgentToolAllowlist, createAgentToolRestrictions } from "../shared/permission-compat"
+} from "./dynamic-agent-prompt-builder";
+import { categorizeTools } from "./dynamic-agent-prompt-builder";
+import {
+  createAgentToolAllowlist,
+  createAgentToolRestrictions,
+} from "../shared/permission-compat";
+import type { FigmaUseMode } from "../config";
 
 type AgentConfigWithSkills = AgentConfig & {
-  skills?: string[]
-}
+  skills?: string[];
+};
 
 interface DesignAgentContext {
-  model: string
-  memorySummary?: string
-  figmaUseEnabled?: boolean
-  figmaUseServerName?: string
-  availableAgents?: AvailableAgent[]
-  availableToolNames?: string[]
-  availableSkills?: AvailableSkill[]
-  availableCategories?: AvailableCategory[]
+  model: string;
+  memorySummary?: string;
+  figmaUseEnabled?: boolean;
+  figmaUseServerName?: string;
+  figmaUseMode?: FigmaUseMode;
+  availableAgents?: AvailableAgent[];
+  availableToolNames?: string[];
+  availableSkills?: AvailableSkill[];
+  availableCategories?: AvailableCategory[];
 }
 
-const PRIMARY_MODE: AgentMode = "primary"
-const SUBAGENT_MODE: AgentMode = "subagent"
+const PRIMARY_MODE: AgentMode = "primary";
+const SUBAGENT_MODE: AgentMode = "subagent";
 
 function buildMemorySection(memorySummary?: string): string {
   if (!memorySummary) {
@@ -32,7 +37,7 @@ function buildMemorySection(memorySummary?: string): string {
 
 No project design-memory packet was loaded.
 If the request depends on product behavior, design language, or user context, inspect the repo docs before acting.
-When docs memory is injected at runtime, treat it as authoritative project guidance.`
+When docs memory is injected at runtime, treat it as authoritative project guidance.`;
   }
 
   return `## Memory Context
@@ -41,47 +46,76 @@ Use this project memory before deciding how to resolve the request.
 Treat it as product and design guidance, not decorative prompt text.
 If additional docs memory is injected into the session, prefer the injected docs for task-specific rules and instructions.
 
-${memorySummary}`
+${memorySummary}`;
 }
 
-function buildFigmaUseSection(enabled?: boolean, serverName?: string): string {
+function buildFigmaUseSection(
+  enabled?: boolean,
+  serverName?: string,
+  mode?: FigmaUseMode,
+): string {
   if (!enabled) {
     return `## Figma Execution Surface
 
 Live Figma mutation is not configured in this session.
-You may still plan, audit, and prepare instructions, but do not assume canvas mutation is available.`
+You may still plan, audit, and prepare instructions, but do not assume canvas mutation is available.`;
+  }
+
+  if (mode === "cli") {
+    return `## Figma Execution Surface
+
+Use the \`figma-daemon\` CLI via the Bash tool for all Figma Plugin API operations.
+
+Rules:
+- Run \`figma-daemon status\` before mutating to verify the connection is live.
+- Inspect the canvas or target node before proposing a mutation (\`figma-daemon node tree\`, \`figma-daemon export jsx <id>\`).
+- Prefer the smallest patch that resolves the comment.
+- For direct comment work, do not invent a browser or REST fallback if the CLI can answer the question.
+- After changes, export or inspect again so review agents can verify the result (\`figma-daemon export node <id> --output /tmp/check.png\`).
+- Use human-readable output by default to save tokens. Use \`--json\` only when parsing specific fields.`;
   }
 
   return `## Figma Execution Surface
 
-Use the \`${serverName ?? "figma-use"}\` MCP server as the source of truth for Figma Plugin API access.
+Use the \`${serverName ?? "figma-daemon"}\` MCP server as the source of truth for Figma Plugin API access.
 
 Rules:
 - Inspect the canvas or target node before proposing a mutation.
 - Prefer the smallest patch that resolves the comment.
-- For direct comment work, do not invent a browser or REST fallback if figma-use can answer the question.
-- After changes, inspect or export again so review agents can verify the result.`
+- For direct comment work, do not invent a browser or REST fallback if figma-daemon can answer the question.
+- After changes, inspect or export again so review agents can verify the result.`;
 }
 
-function buildAgentRosterSection(availableAgents: AvailableAgent[] = []): string {
+function buildAgentRosterSection(
+  availableAgents: AvailableAgent[] = [],
+): string {
   if (availableAgents.length === 0) {
-    return ""
+    return "";
   }
 
-  const rows = availableAgents.map((agent) => `- \`${agent.name}\`: ${agent.description}`)
+  const rows = availableAgents.map(
+    (agent) => `- \`${agent.name}\`: ${agent.description}`,
+  );
   return `## Available Specialists
 
-${rows.join("\n")}`
+${rows.join("\n")}`;
 }
 
-function buildToolingSection(toolNames: string[] = [], categories: AvailableCategory[] = []): string {
-  const tools = categorizeTools(toolNames)
-  const toolSummary = tools.length === 0
-    ? "- No tool inventory provided"
-    : tools.map((tool) => `- \`${tool.name}\` (${tool.category})`).join("\n")
-  const categorySummary = categories.length === 0
-    ? "- No category inventory provided"
-    : categories.map((category) => `- \`${category.name}\`: ${category.description}`).join("\n")
+function buildToolingSection(
+  toolNames: string[] = [],
+  categories: AvailableCategory[] = [],
+): string {
+  const tools = categorizeTools(toolNames);
+  const toolSummary =
+    tools.length === 0
+      ? "- No tool inventory provided"
+      : tools.map((tool) => `- \`${tool.name}\` (${tool.category})`).join("\n");
+  const categorySummary =
+    categories.length === 0
+      ? "- No category inventory provided"
+      : categories
+          .map((category) => `- \`${category.name}\`: ${category.description}`)
+          .join("\n");
 
   return `## Runtime Inventory
 
@@ -89,11 +123,11 @@ Tools:
 ${toolSummary}
 
 Categories:
-${categorySummary}`
+${categorySummary}`;
 }
 
 function maybeSkillList(figmaUseEnabled?: boolean): string[] | undefined {
-  return figmaUseEnabled ? ["figma-use"] : undefined
+  return figmaUseEnabled ? ["figma-daemon"] : undefined;
 }
 
 export function createSolacyAgent(ctx: DesignAgentContext): AgentConfig {
@@ -102,14 +136,14 @@ export function createSolacyAgent(ctx: DesignAgentContext): AgentConfig {
     model: ctx.model,
     color: "#0F766E",
     description:
-      "Design lead for Figma comment resolution. Loads project design memory, routes to planning/execution/review specialists, and treats figma-use MCP as the primary Figma execution surface. (Solacy - OhMyDesignAgent)",
+      "Design lead for Figma comment resolution. Loads project design memory, routes to planning/execution/review specialists, and treats figma-daemon as the primary Figma execution surface. (Solacy - OhMyDesignAgent)",
     prompt: `You are Solacy, the design lead for OhMyDesignAgent.
 
 Your job is to resolve design feedback with the right balance of product context, design-system rigor, and Figma execution discipline.
 
 ${buildMemorySection(ctx.memorySummary)}
 
-${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName)}
+${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
 ${buildAgentRosterSection(ctx.availableAgents)}
 
@@ -120,17 +154,22 @@ Operating rules:
 - Load memory and inspect context before deciding whether this is copy, token, spacing, layout, creation, or broader design improvement work.
 - Route comment-resolution work through the comment planner and comment conductor mindset, not generic coding heuristics.
 - Use explore for local design-system and product-context discovery.
-- Use librarian for Figma Plugin API, figma-use MCP behavior, and external pattern research.
+- Use librarian for Figma Plugin API, figma-daemon MCP behavior, and external pattern research.
 - Use review agents after execution instead of declaring success from the patch alone.
-- If context is missing or memory conflicts with the request, pause and ask for clarification rather than mutating the canvas blindly.`,
+- If context is missing or memory conflicts with the request, pause and ask for clarification rather than mutating the canvas blindly.
+
+Comment resolution protocol:
+- ALWAYS inspect the target node before making any changes. Use \`figma-daemon node tree <nodeId>\` and \`figma-daemon export jsx <nodeId>\` to understand the current state.
+- ALWAYS reply to the comment with a summary of the work done before resolving it. Use \`figma-daemon comment add "<summary>" --reply <commentId>\` to post the reply.
+- ONLY resolve the comment after replying with relevant work data. Use \`figma-daemon comment resolve <commentId>\` as the final step.
+- Never resolve a comment without first replying to it. The reply should describe what was changed and why.`,
     permission: {
       question: "allow",
-      call_omo_agent: "deny",
     },
     skills: maybeSkillList(ctx.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
 export function createDesignWorkerAgent(ctx: DesignAgentContext): AgentConfig {
@@ -139,12 +178,12 @@ export function createDesignWorkerAgent(ctx: DesignAgentContext): AgentConfig {
     model: ctx.model,
     color: "#C2410C",
     description:
-      "Autonomous deep design worker for explicit design tasks beyond single comments. Grounds itself in design memory, local patterns, and figma-use-backed canvas operations. (Design Worker - OhMyDesignAgent)",
+      "Autonomous deep design worker for explicit design tasks beyond single comments. Grounds itself in design memory, local patterns, and figma-daemon-backed canvas operations. (Design Worker - OhMyDesignAgent)",
     prompt: `You are the Design Worker, a deep design execution agent.
 
 ${buildMemorySection(ctx.memorySummary)}
 
-${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName)}
+${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
 Execution rules:
 - Explore before acting. Read product and design memory that changes the decision.
@@ -159,12 +198,14 @@ Execution rules:
       call_omo_agent: "deny",
     },
     skills: maybeSkillList(ctx.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
-export function createCommentConductorAgent(ctx: DesignAgentContext): AgentConfig {
+export function createCommentConductorAgent(
+  ctx: DesignAgentContext,
+): AgentConfig {
   const config: AgentConfigWithSkills = {
     mode: PRIMARY_MODE,
     model: ctx.model,
@@ -175,7 +216,7 @@ export function createCommentConductorAgent(ctx: DesignAgentContext): AgentConfi
 
 ${buildMemorySection(ctx.memorySummary)}
 
-${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName)}
+${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
 Your phases:
 1. Ask the planner to classify the comment and identify the exact target/scope.
@@ -195,19 +236,21 @@ Policy:
       call_omo_agent: "deny",
     },
     skills: maybeSkillList(ctx.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
-export function createCommentPlannerAgent(ctx: DesignAgentContext): AgentConfig {
+export function createCommentPlannerAgent(
+  ctx: DesignAgentContext,
+): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
     "apply_patch",
     "task",
     "call_omo_agent",
-  ])
+  ]);
 
   const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
@@ -221,7 +264,7 @@ export function createCommentPlannerAgent(ctx: DesignAgentContext): AgentConfig 
 
 ${buildMemorySection(ctx.memorySummary)}
 
-${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName)}
+${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
 Responsibilities:
 - Classify the request type: copy_change, token_bind, color_update, spacing_fix, typography_update, layout_change, new_component, design_improvement.
@@ -238,13 +281,15 @@ Output requirements:
 
 Do not mutate files or the canvas. Planning only.`,
     skills: maybeSkillList(ctx.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
-export function createVisionReviewerAgent(ctx: DesignAgentContext): AgentConfig {
-  const restrictions = createAgentToolAllowlist(["read", "look_at"])
+export function createVisionReviewerAgent(
+  ctx: DesignAgentContext,
+): AgentConfig {
+  const restrictions = createAgentToolAllowlist(["read", "look_at"]);
 
   return {
     mode: SUBAGENT_MODE,
@@ -266,7 +311,7 @@ Review focus:
 
 Return crisp visual findings with severity and concrete correction hints.
 Do not implement fixes yourself.`,
-  }
+  };
 }
 
 export function createDesignAuditorAgent(ctx: DesignAgentContext): AgentConfig {
@@ -276,7 +321,7 @@ export function createDesignAuditorAgent(ctx: DesignAgentContext): AgentConfig {
     "apply_patch",
     "task",
     "call_omo_agent",
-  ])
+  ]);
 
   const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
@@ -290,7 +335,7 @@ export function createDesignAuditorAgent(ctx: DesignAgentContext): AgentConfig {
 
 ${buildMemorySection(ctx.memorySummary)}
 
-${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName)}
+${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
 Audit for:
 - semantic token and variable binding usage
@@ -302,37 +347,39 @@ Audit for:
 Return specific findings and the smallest corrective action for each.
 Do not mutate the canvas yourself.`,
     skills: maybeSkillList(ctx.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
 export function createCanvasExecutorAgent(args: {
-  model: string
-  memorySummary?: string
-  figmaUseEnabled?: boolean
-  figmaUseServerName?: string
-  promptAppend?: string
+  model: string;
+  memorySummary?: string;
+  figmaUseEnabled?: boolean;
+  figmaUseServerName?: string;
+  figmaUseMode?: FigmaUseMode;
+  promptAppend?: string;
 }): AgentConfig {
-  const restrictions = createAgentToolRestrictions(["task"])
-  const promptAppend = args.promptAppend ? `\n\n${args.promptAppend}` : ""
+  const restrictions = createAgentToolRestrictions(["task"]);
+  const promptAppend = args.promptAppend ? `\n\n${args.promptAppend}` : "";
+  const executionSurface =
+    args.figmaUseMode === "cli" ? "figma-daemon CLI" : "figma-daemon MCP";
   const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
     model: args.model,
     color: "#14B8A6",
     maxTokens: 32000,
     ...restrictions,
-    description:
-      "Focused Figma canvas executor. Uses figma-use MCP for node inspection, patching, rendering, and export. No delegation. (Canvas Executor - OhMyDesignAgent)",
+    description: `Focused Figma canvas executor. Uses ${executionSurface} for node inspection, patching, rendering, and export. No delegation. (Canvas Executor - OhMyDesignAgent)`,
     prompt: `You are the Canvas Executor.
 
 ${buildMemorySection(args.memorySummary)}
 
-${buildFigmaUseSection(args.figmaUseEnabled, args.figmaUseServerName)}
+${buildFigmaUseSection(args.figmaUseEnabled, args.figmaUseServerName, args.figmaUseMode)}
 
 Execution rules:
 - You do not delegate.
-- Use figma-use MCP as the primary execution surface when enabled.
+- Use ${executionSurface} as the primary execution surface when enabled.
 - Inspect before mutating.
 - For easy comment fixes, prefer the smallest direct patch.
 - For layout or creation work, render variants only when the planner or conductor requested them.
@@ -340,9 +387,9 @@ Execution rules:
 - After mutating, gather enough output for review agents to verify the result.${promptAppend}`,
     reasoningEffort: "medium",
     skills: maybeSkillList(args.figmaUseEnabled),
-  }
+  };
 
-  return config
+  return config;
 }
 
 export const COMMENT_PLANNER_PROMPT_METADATA: AgentPromptMetadata = {
@@ -352,7 +399,8 @@ export const COMMENT_PLANNER_PROMPT_METADATA: AgentPromptMetadata = {
   triggers: [
     {
       domain: "Comment classification",
-      trigger: "Identify request type, target scope, confidence, and memory requirements before execution",
+      trigger:
+        "Identify request type, target scope, confidence, and memory requirements before execution",
     },
   ],
   useWhen: [
@@ -360,7 +408,7 @@ export const COMMENT_PLANNER_PROMPT_METADATA: AgentPromptMetadata = {
     "Determining whether a design task needs clarification or variants",
   ],
   keyTrigger: "Figma comment or design feedback thread -> fire comment planner",
-}
+};
 
 export const VISION_REVIEWER_PROMPT_METADATA: AgentPromptMetadata = {
   category: "specialist",
@@ -377,7 +425,7 @@ export const VISION_REVIEWER_PROMPT_METADATA: AgentPromptMetadata = {
     "Comparing design variants or before/after screenshots",
   ],
   keyTrigger: "Rendered output or screenshot available -> fire vision reviewer",
-}
+};
 
 export const DESIGN_AUDITOR_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",
@@ -386,7 +434,8 @@ export const DESIGN_AUDITOR_PROMPT_METADATA: AgentPromptMetadata = {
   triggers: [
     {
       domain: "Design-system audit",
-      trigger: "Check variable bindings, spacing, naming, and design hygiene after execution",
+      trigger:
+        "Check variable bindings, spacing, naming, and design hygiene after execution",
     },
   ],
   useWhen: [
@@ -394,4 +443,4 @@ export const DESIGN_AUDITOR_PROMPT_METADATA: AgentPromptMetadata = {
     "Need hygiene and token-binding checks after a comment resolution",
   ],
   keyTrigger: "After a Figma mutation -> fire design auditor",
-}
+};
