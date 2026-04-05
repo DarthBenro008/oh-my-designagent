@@ -1,57 +1,69 @@
 import type { BuiltinSkill } from "../types";
 import type { FigmaUseConfig } from "../../../config";
+import type { CommentRequestType } from "../../../shared/comment-classification";
 
-function buildMcpSkill(
-  config: FigmaUseConfig | undefined,
-  serverName: string,
-): BuiltinSkill {
-  const mcpConfig = config?.url
-    ? {
-        [serverName]: {
-          type: "http" as const,
-          url: config.url,
-        },
-      }
-    : {
-        [serverName]: {
-          type: "stdio" as const,
-          command: config?.command ?? "npx",
-          args: config?.args ?? ["-y", "figma-daemon", "mcp", "serve"],
-        },
-      };
+const PATCH_TASK_TYPES = new Set<CommentRequestType>([
+  "copy_change",
+  "token_bind",
+  "color_update",
+  "spacing_fix",
+  "typography_update",
+]);
 
-  return {
-    name: "figma-daemon",
-    description:
-      "Figma Plugin API operations through the figma-daemon MCP server. Use for canvas inspection, node inspection, patching, rendering, export, and other Figma mutations.",
-    template: `# figma-daemon MCP
+const CREATION_TASK_TYPES = new Set<CommentRequestType>([
+  "new_component",
+  "layout_change",
+  "design_improvement",
+]);
 
-Use the \`${serverName}\` MCP server for Figma Plugin API access.
+function buildCliSkillTrimmed(): string {
+  return `# figma-daemon CLI
 
-Workflow:
-1. Check MCP/server status before mutating if the task depends on live canvas state.
-2. Inspect the target node or canvas first.
-3. Apply the smallest viable patch for comment-resolution work.
-4. Export or inspect again after the change for verification.
+CLI for Figma patch work. Run commands via Bash. Keep edits surgical and verify after each mutation.
 
-Use figma-daemon for:
-- canvas and node inspection
-- variable and binding inspection
-- patching existing nodes
-- rendering new nodes or variants
-- exporting screenshots or artifacts for visual review
+## Before You Start
 
-Do not guess about Figma structure when the MCP can inspect it directly.`,
-    mcpConfig,
-  };
+\`\`\`bash
+figma-daemon status  # Check connection before mutating
+\`\`\`
+
+## Common Patch Commands
+
+\`\`\`bash
+# Inspect
+figma-daemon node tree <id> --depth 3
+figma-daemon node get <id>
+figma-daemon node bindings <id>
+
+# Mutate
+figma-daemon set fill <id> "$Colors/Primary"
+figma-daemon set text <id> "New text"
+figma-daemon set layout <id> --gap 12 --padding 16
+figma-daemon set font <id> --family "Inter" --size 16 --weight 600
+figma-daemon set radius <id> 8
+
+# Verify
+figma-daemon export node <id> --output /tmp/check.png
+figma-daemon export screenshot --output /tmp/viewport.png
+
+# Comments
+figma-daemon comment add "Updated the requested patch" --reply <threadId>
+figma-daemon comment resolve <threadId>
+
+# Tokens
+figma-daemon variable find "Colors"
+\`\`\`
+
+## Best Practices for Patches
+
+- Inspect before mutating with \`figma-daemon node get\` or \`figma-daemon node tree\`.
+- Apply the smallest viable patch instead of rebuilding larger structures.
+- Use \`$Variable\` token references for colors and other bound values when available.
+- Export the changed node or viewport for verification before considering the work done.`;
 }
 
-function buildCliSkill(): BuiltinSkill {
-  return {
-    name: "figma-daemon",
-    description:
-      "Control Figma via the figma-daemon CLI. Use Bash to run figma-daemon commands for canvas inspection, node creation, patching, rendering, export, and other Figma mutations.",
-    template: `# figma-daemon CLI
+function buildCliSkillFull(): string {
+  return `# figma-daemon CLI
 
 CLI for Figma. Run commands via Bash. Two modes: imperative commands and declarative JSX.
 
@@ -209,13 +221,91 @@ figma-daemon lint --preset accessibility
 3. Apply the smallest viable patch for comment-resolution work.
 4. Export or inspect again after the change for verification.
 
-Do not guess about Figma structure — inspect it directly with the CLI.`,
+Do not guess about Figma structure — inspect it directly with the CLI.
+
+## JSX Rendering Excellence
+
+1. ALWAYS export existing node first: \`figma-daemon export jsx <nodeId> --pretty\`
+2. Use \`$Variable\` syntax for ALL colors. Never hardcode hex in production renders.
+3. Position with \`--x\` and \`--y\` always. Never stack new work at \`0,0\`.
+4. Use \`defineComponent\` for reusable elements and \`defineComponentSet\` for variants.
+5. After rendering, check result: \`figma-daemon export node <newId> --output /tmp/check.png\`
+6. After initial render, use diffs or direct set commands for tweaks. Don't re-render full JSX trees.
+7. Run \`figma-daemon lint --root <newNodeId>\` after rendering to check compliance.`;
+}
+
+function buildCliSkill(taskType?: CommentRequestType): string {
+  if (taskType && PATCH_TASK_TYPES.has(taskType)) {
+    return buildCliSkillTrimmed();
+  }
+
+  if (taskType && CREATION_TASK_TYPES.has(taskType)) {
+    return buildCliSkillFull();
+  }
+
+  return buildCliSkillFull();
+}
+
+function buildMcpSkill(
+  config: FigmaUseConfig | undefined,
+  serverName: string,
+): BuiltinSkill {
+  const mcpConfig = config?.url
+    ? {
+        [serverName]: {
+          type: "http" as const,
+          url: config.url,
+        },
+      }
+    : {
+        [serverName]: {
+          type: "stdio" as const,
+          command: config?.command ?? "npx",
+          args: config?.args ?? ["-y", "figma-daemon", "mcp", "serve"],
+        },
+      };
+
+  return {
+    name: "figma-daemon",
+    description:
+      "Figma Plugin API operations through the figma-daemon MCP server. Use for canvas inspection, node inspection, patching, rendering, export, and other Figma mutations.",
+    template: `# figma-daemon MCP
+
+Use the \`${serverName}\` MCP server for Figma Plugin API access.
+
+Workflow:
+1. Check MCP/server status before mutating if the task depends on live canvas state.
+2. Inspect the target node or canvas first.
+3. Apply the smallest viable patch for comment-resolution work.
+4. Export or inspect again after the change for verification.
+
+Use figma-daemon for:
+- canvas and node inspection
+- variable and binding inspection
+- patching existing nodes
+- rendering new nodes or variants
+- exporting screenshots or artifacts for visual review
+
+Do not guess about Figma structure when the MCP can inspect it directly.`,
+    mcpConfig,
   };
 }
 
-export function createFigmaUseSkill(config?: FigmaUseConfig): BuiltinSkill {
+function buildCliSkillDefinition(taskType?: CommentRequestType): BuiltinSkill {
+  return {
+    name: "figma-daemon",
+    description:
+      "Control Figma via the figma-daemon CLI. Use Bash to run figma-daemon commands for canvas inspection, node creation, patching, rendering, export, and other Figma mutations.",
+    template: buildCliSkill(taskType),
+  };
+}
+
+export function createFigmaUseSkill(
+  config?: FigmaUseConfig,
+  taskType?: CommentRequestType,
+): BuiltinSkill {
   if (config?.mode === "cli") {
-    return buildCliSkill();
+    return buildCliSkillDefinition(taskType);
   }
 
   const serverName = config?.mcp_server_name ?? "figma-daemon";
