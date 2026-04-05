@@ -8,7 +8,7 @@ This fork keeps the published package and CLI name `oh-my-opencode`, but the run
 bunx oh-my-opencode install
 ```
 
-The installer still sets up the OpenCode plugin registration and baseline config. After that, add the design-specific config needed for docs-first memory and `figma-use`.
+The installer still sets up the OpenCode plugin registration and baseline config. After that, add the design-specific config needed for docs-first memory and `figma-daemon`.
 
 ## What To Verify
 
@@ -49,7 +49,7 @@ Recommended minimum:
 
   "figma_use": {
     "enabled": true,
-    "mcp_server_name": "figma-use",
+    "mcp_server_name": "figma-daemon",
     "require_status_check": true
   },
 
@@ -94,14 +94,14 @@ Good candidates include:
 
 The runtime will load the most relevant docs first and inject them into the session through the existing context pipeline.
 
-## `figma-use` MCP
+## `figma-daemon` MCP
 
-When `figma_use.enabled` is on, the builtin skill exposes `figma-use` as the Figma Plugin API execution surface.
+When `figma_use.enabled` is on, the builtin skill exposes `figma-daemon` as the Figma Plugin API execution surface.
 
 By default it launches a stdio MCP server with:
 
 ```bash
-npx -y figma-use mcp serve
+npx -y figma-daemon mcp serve
 ```
 
 If you run your own server, set `figma_use.url` or provide a custom `command` and `args`.
@@ -128,7 +128,7 @@ The usual setup is:
 
 1. Put product, design-system, copy, and user-behavior rules in `docs/`.
 2. Configure `.opencode/oh-my-opencode.jsonc`.
-3. Make sure `figma-use` MCP is reachable.
+3. Make sure `figma-daemon` MCP is reachable.
 4. Open OpenCode and ask the default agent to resolve a Figma comment, or trigger that flow through your own comment transport.
 
 Typical prompts:
@@ -142,7 +142,7 @@ The expected execution path is:
 1. Solacy receives the task.
 2. Docs memory loads from `docs/`.
 3. Comment Planner classifies the request.
-4. Canvas Executor performs the Figma mutation through `figma-use`.
+4. Canvas Executor performs the Figma mutation through `figma-daemon`.
 5. Vision Reviewer and Design Auditor verify the result.
 
 ## Optional Spend Limit
@@ -170,7 +170,7 @@ Then the default design flow becomes:
 1. load docs memory
 2. classify the Figma comment
 3. inspect the canvas
-4. mutate through `figma-use`
+4. mutate through `figma-daemon`
 5. review and audit the result
 
 ## Compatibility Notes

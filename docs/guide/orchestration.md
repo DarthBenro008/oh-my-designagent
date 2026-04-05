@@ -10,7 +10,7 @@ The default path is:
 2. Docs-memory preloading injects relevant project guidance from `docs/`.
 3. Comment Conductor starts the job.
 4. Comment Planner classifies the work and selects memory.
-5. Canvas Executor performs the Figma operation through `figma-use`.
+5. Canvas Executor performs the Figma operation through `figma-daemon`.
 6. Vision Reviewer and Design Auditor verify the result.
 7. Comment Conductor accepts, retries once, or asks for clarification.
 

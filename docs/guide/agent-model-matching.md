@@ -62,7 +62,7 @@ Canvas Executor should prioritize reliability over flourish.
 It needs to:
 
 - inspect before changing
-- mutate through `figma-use`
+- mutate through `figma-daemon`
 - verify after changing
 
 Good fit:

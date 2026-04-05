@@ -51,7 +51,7 @@ Safer:
 Riskier:
 
 - tool-heavy exploration
-- `figma-use` driven execution
+- `figma-daemon` driven execution
 - any flow that depends on structured tool-call parsing
 
 ### Validation

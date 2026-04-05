@@ -11,7 +11,7 @@ The runtime still stores configuration under the existing internal agent keys, b
 | `sisyphus` | Solacy (Design Lead) | Main entrypoint and design lead |
 | `atlas` | Comment Conductor | Orchestrates the comment-resolution lifecycle |
 | `hephaestus` | Design Worker | Deep design execution agent |
-| `sisyphus-junior` | Canvas Executor | Mutates Figma through `figma-use` only |
+| `sisyphus-junior` | Canvas Executor | Mutates Figma through `figma-daemon` only |
 | `metis` | Comment Planner | Reads context, classifies the request, chooses the path |
 | `momus` | Vision Reviewer | Reviews screenshots, exports, and visual deltas |
 | `oracle` | Design Auditor | Audits rule compliance and design-system hygiene |
@@ -33,14 +33,14 @@ The runtime still stores configuration under the existing internal agent keys, b
 ### Design Worker
 
 - handles broader design tasks outside the strict comment loop
-- still uses docs memory and `figma-use` when the task depends on live canvas state
+- still uses docs memory and `figma-daemon` when the task depends on live canvas state
 
 ### Canvas Executor
 
 - no delegation
 - expected to inspect before patching
 - expected to verify after patching
-- should only mutate through `figma-use`
+- should only mutate through `figma-daemon`
 
 ### Comment Planner
 

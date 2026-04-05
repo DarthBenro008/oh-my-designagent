@@ -6,7 +6,7 @@ That capability data matters here because the design-agent runtime still depends
 
 - Solacy and Comment Conductor model resolution
 - reviewer and auditor reasoning settings
-- `figma-use` and multimodal workflows that depend on stable model capabilities
+- `figma-daemon` and multimodal workflows that depend on stable model capabilities
 
 ## Capability Resolution Layers
 

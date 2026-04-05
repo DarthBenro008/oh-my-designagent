@@ -16,7 +16,7 @@ That affects:
 
 - orchestration agent stability
 - reviewer and auditor reasoning settings
-- request behavior on multimodal and `figma-use` related flows
+- request behavior on multimodal and `figma-daemon` related flows
 
 ## Problem
 

@@ -45,7 +45,7 @@ Preferred project filename:
 
   "figma_use": {
     "enabled": true,
-    "mcp_server_name": "figma-use",
+    "mcp_server_name": "figma-daemon",
     "require_status_check": true
   },
 
@@ -104,11 +104,11 @@ Memory is loaded into `contextCollector` through the docs-memory preloader hook 
 
 ## `figma_use`
 
-`figma_use` controls the builtin `figma-use` MCP skill.
+`figma_use` controls the builtin `figma-daemon` MCP skill.
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `enabled` | boolean | Enables the builtin `figma-use` skill |
+| `enabled` | boolean | Enables the builtin `figma-daemon` skill |
 | `mcp_server_name` | string | MCP server name exposed to the runtime |
 | `require_status_check` | boolean | Instructs agents to verify MCP status before mutating |
 | `url` | string | Optional HTTP MCP endpoint |
@@ -118,7 +118,7 @@ Memory is loaded into `contextCollector` through the docs-memory preloader hook 
 If `url` is omitted, the builtin skill defaults to a stdio server launched with:
 
 ```bash
-npx -y figma-use mcp serve
+npx -y figma-daemon mcp serve
 ```
 
 ## `figma.comment_resolution`

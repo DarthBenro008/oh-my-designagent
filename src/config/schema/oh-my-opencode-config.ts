@@ -1,30 +1,30 @@
-import { z } from "zod"
-import { AnyMcpNameSchema } from "../../mcp/types"
-import { BuiltinSkillNameSchema } from "./agent-names"
-import { AgentOverridesSchema } from "./agent-overrides"
-import { BabysittingConfigSchema } from "./babysitting"
-import { BackgroundTaskConfigSchema } from "./background-task"
-import { BrowserAutomationConfigSchema } from "./browser-automation"
-import { CategoriesConfigSchema } from "./categories"
-import { ClaudeCodeConfigSchema } from "./claude-code"
-import { CommentCheckerConfigSchema } from "./comment-checker"
-import { DesignMemoryConfigSchema } from "./design-memory"
-import { BuiltinCommandNameSchema } from "./commands"
-import { ExperimentalConfigSchema } from "./experimental"
-import { FigmaConfigSchema } from "./figma"
-import { FigmaUseConfigSchema } from "./figma-use"
-import { GitMasterConfigSchema } from "./git-master"
-import { NotificationConfigSchema } from "./notification"
-import { OpenClawConfigSchema } from "./openclaw"
-import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
-import { RalphLoopConfigSchema } from "./ralph-loop"
-import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
-import { SkillsConfigSchema } from "./skills"
-import { SisyphusConfigSchema } from "./sisyphus"
-import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
-import { TmuxConfigSchema } from "./tmux"
-import { StartWorkConfigSchema } from "./start-work"
-import { WebsearchConfigSchema } from "./websearch"
+import { z } from "zod";
+import { AnyMcpNameSchema } from "../../mcp/types";
+import { BuiltinSkillNameSchema } from "./agent-names";
+import { AgentOverridesSchema } from "./agent-overrides";
+import { BabysittingConfigSchema } from "./babysitting";
+import { BackgroundTaskConfigSchema } from "./background-task";
+import { BrowserAutomationConfigSchema } from "./browser-automation";
+import { CategoriesConfigSchema } from "./categories";
+import { ClaudeCodeConfigSchema } from "./claude-code";
+import { CommentCheckerConfigSchema } from "./comment-checker";
+import { DesignMemoryConfigSchema } from "./design-memory";
+import { BuiltinCommandNameSchema } from "./commands";
+import { ExperimentalConfigSchema } from "./experimental";
+import { FigmaConfigSchema } from "./figma";
+import { FigmaUseConfigSchema } from "./figma-use";
+import { GitMasterConfigSchema } from "./git-master";
+import { NotificationConfigSchema } from "./notification";
+import { OpenClawConfigSchema } from "./openclaw";
+import { ModelCapabilitiesConfigSchema } from "./model-capabilities";
+import { RalphLoopConfigSchema } from "./ralph-loop";
+import { RuntimeFallbackConfigSchema } from "./runtime-fallback";
+import { SkillsConfigSchema } from "./skills";
+import { SisyphusConfigSchema } from "./sisyphus";
+import { SisyphusAgentConfigSchema } from "./sisyphus-agent";
+import { TmuxConfigSchema } from "./tmux";
+import { StartWorkConfigSchema } from "./start-work";
+import { WebsearchConfigSchema } from "./websearch";
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -61,7 +61,9 @@ export const OhMyOpenCodeConfigSchema = z.object({
    * Set to false to disable, or use object for advanced config:
    * { "enabled": true, "retry_on_errors": [400, 429], "timeout_seconds": 30 }
    */
-  runtime_fallback: z.union([z.boolean(), RuntimeFallbackConfigSchema]).optional(),
+  runtime_fallback: z
+    .union([z.boolean(), RuntimeFallbackConfigSchema])
+    .optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
@@ -79,6 +81,6 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
-})
+});
 
-export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
+export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>;

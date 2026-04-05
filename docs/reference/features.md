@@ -31,9 +31,9 @@ It:
 
 This is the main behavioral shift from the older code-first runtime.
 
-### `figma-use` MCP Skill
+### `figma-daemon` MCP Skill
 
-The builtin `figma-use` skill provides Figma Plugin API access through MCP.
+The builtin `figma-daemon` skill provides Figma Plugin API access through MCP.
 
 Expected operations include:
 

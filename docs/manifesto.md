@@ -74,7 +74,7 @@ That keeps memory grounded in repo truth instead of hand-written prompt drift.
 
 Design work should happen against real Figma state whenever possible.
 
-That is why `figma-use` MCP is a first-class part of the fork:
+That is why `figma-daemon` MCP is a first-class part of the fork:
 
 - inspect before mutating
 - mutate through the plugin API surface

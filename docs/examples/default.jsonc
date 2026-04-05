@@ -69,7 +69,7 @@
 
   "figma_use": {
     "enabled": true,
-    "mcp_server_name": "figma-use",
+    "mcp_server_name": "figma-daemon",
     "require_status_check": true
   },
 

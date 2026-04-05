@@ -6,7 +6,7 @@ This fork replaces the old coding-first execution backbone with a design-first a
 
 - reads project rules from `docs/` before acting
 - uses the existing plugin context injection pipeline for memory
-- treats `figma-use` MCP as the Figma Plugin API execution surface
+- treats `figma-daemon` MCP as the Figma Plugin API execution surface
 - routes comment work through planning, execution, visual review, and design audit
 - can hard-stop all work when `OPENCODE_SESSION_BUDGET_USD` is exceeded
 
@@ -19,7 +19,7 @@ The primary workflow is resolving Figma comments with project context.
 1. A design request or Figma comment arrives.
 2. Docs-first memory loads from the repo `docs/` folder.
 3. The planner classifies the request and selects the right context.
-4. The executor uses `figma-use` MCP to inspect and mutate the canvas.
+4. The executor uses `figma-daemon` MCP to inspect and mutate the canvas.
 5. Review and audit agents verify the result before completion.
 
 This is not "generic multi-agent coding with some design sprinkled in". The design agents and docs-memory path are now the backbone.
@@ -59,7 +59,7 @@ Explicit `design_memory.files` still work, but they now act as required override
 
 ## Figma Execution
 
-Figma work is executed through the builtin `figma-use` skill and MCP integration.
+Figma work is executed through the builtin `figma-daemon` skill and MCP integration.
 
 The expected flow is:
 
@@ -105,7 +105,7 @@ Compatibility paths such as `.opencode/oh-my-openagent.jsonc` are still accepted
 
   "figma_use": {
     "enabled": true,
-    "mcp_server_name": "figma-use",
+    "mcp_server_name": "figma-daemon",
     "require_status_check": true
   },
 
@@ -130,12 +130,12 @@ Install the plugin:
 bunx oh-my-opencode install
 ```
 
-Then add or adapt your project config at `.opencode/oh-my-opencode.jsonc`, make sure your repo has a useful `docs/` folder, and enable `figma-use`.
+Then add or adapt your project config at `.opencode/oh-my-opencode.jsonc`, make sure your repo has a useful `docs/` folder, and enable `figma-daemon`.
 
 Typical workflow:
 
 1. Start OpenCode with this plugin enabled.
-2. Point `figma_use` at your `figma-use` MCP server.
+2. Point `figma_use` at your `figma-daemon` MCP server.
 3. Ask Solacy to resolve a Figma comment or run the flow through your comment transport.
 4. The system loads relevant docs memory, plans the fix, mutates Figma, then reviews and audits it.
 

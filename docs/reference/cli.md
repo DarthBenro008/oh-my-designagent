@@ -145,7 +145,7 @@ JSONC is preferred.
 The CLI itself is generic, but the current fork expects these runtime features to be configured:
 
 - docs-first memory from `docs/`
-- `figma-use` MCP
+- `figma-daemon` MCP
 - Figma comment-resolution settings
 
 See:

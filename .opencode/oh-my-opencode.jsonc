@@ -33,7 +33,7 @@
     "sisyphus-junior": {
       "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.1,
-      "prompt_append": "Act as Canvas Executor. Inspect before mutating, use figma-use for all Figma changes, and keep edits minimal and verifiable."
+      "prompt_append": "Act as Canvas Executor. Inspect before mutating, use figma-daemon for all Figma changes, and keep edits minimal and verifiable."
     },
 
     "metis": {
@@ -81,7 +81,7 @@
 
   "figma_use": {
     "enabled": true,
-    "mcp_server_name": "figma-use",
+    "mcp_server_name": "figma-daemon",
     "require_status_check": true
   },
 

@@ -1,6 +1,4 @@
-export {
-  OhMyOpenCodeConfigSchema,
-} from "./schema"
+export { OhMyOpenCodeConfigSchema } from "./schema";
 
 export type {
   OhMyOpenCodeConfig,
@@ -18,6 +16,7 @@ export type {
   FigmaCommentResolutionConfig,
   FigmaConfig,
   FigmaUseConfig,
+  FigmaUseMode,
   TmuxConfig,
   TmuxLayout,
   SisyphusConfig,
@@ -25,4 +24,4 @@ export type {
   RuntimeFallbackConfig,
   ModelCapabilitiesConfig,
   FallbackModels,
-} from "./schema"
+} from "./schema";

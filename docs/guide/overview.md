@@ -5,7 +5,7 @@ Oh My DesignAgent is a design-first OpenCode plugin fork for resolving Figma com
 The old coding-centric execution story is no longer the center of this fork. The runtime now assumes that high-value work looks like:
 
 - loading project design and product guidance
-- inspecting real Figma state through `figma-use`
+- inspecting real Figma state through `figma-daemon`
 - making targeted canvas changes
 - reviewing the result before closing the loop
 
@@ -31,7 +31,7 @@ The runtime uses the existing internal agent keys, but their responsibilities ha
 | `sisyphus` | Solacy | Primary design lead and default routing agent |
 | `atlas` | Comment Conductor | Runs the end-to-end comment workflow |
 | `hephaestus` | Design Worker | Handles deeper design tasks outside the standard comment path |
-| `sisyphus-junior` | Canvas Executor | Performs direct Figma mutation through `figma-use` |
+| `sisyphus-junior` | Canvas Executor | Performs direct Figma mutation through `figma-daemon` |
 | `metis` | Comment Planner | Chooses request type, scope, and memory needs |
 | `momus` | Vision Reviewer | Reviews screenshots and exports |
 | `oracle` | Design Auditor | Audits system compliance and canvas hygiene |
@@ -58,7 +58,7 @@ This gives the fork a practical memory model without introducing a separate vect
 
 ## Figma Execution Surface
 
-Figma changes are expected to happen through `figma-use` MCP.
+Figma changes are expected to happen through `figma-daemon` MCP.
 
 The executor should:
 
@@ -76,7 +76,7 @@ This fork still inherits most of the plugin infrastructure, but several behavior
 - the main execution backbone is now design-oriented
 - docs-first memory is proactive, not reactive
 - design review is built into the default flow
-- `figma-use` is a first-class builtin skill
+- `figma-daemon` is a first-class builtin skill
 - configuration includes `design_memory`, `figma_use`, and `figma.comment_resolution`
 
 For the exact orchestration path, see [Orchestration](./orchestration.md). For the config surface, see [Configuration](../reference/configuration.md).
