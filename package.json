@@ -60,7 +60,7 @@
     "@code-yeongyu/comment-checker": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.2.24",
-    "@opencode-ai/sdk": "^1.2.24",
+    "@opencode-ai/sdk": "1.3.17",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
     "diff": "^8.0.3",
@@ -91,7 +91,7 @@
     "oh-my-opencode-windows-x64-baseline": "3.14.0"
   },
   "overrides": {
-    "@opencode-ai/sdk": "^1.2.24"
+    "@opencode-ai/sdk": "1.3.17"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
