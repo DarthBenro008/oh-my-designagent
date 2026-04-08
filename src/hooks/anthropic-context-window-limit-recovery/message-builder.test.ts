@@ -1,53 +1,52 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared", () => ({
-  normalizeSDKResponse: (response: { data?: unknown[] }) => response.data ?? [],
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-}))
-
-mock.module("../session-recovery/storage", () => ({
-  findEmptyMessages: () => [],
-  findMessagesWithEmptyTextParts: () => [],
-  injectTextPart: () => false,
-  replaceEmptyTextParts: () => false,
-}))
-
-mock.module("../session-recovery/storage/empty-text", () => ({
-  replaceEmptyTextPartsAsync,
-  findMessagesWithEmptyTextPartsFromSDK,
-}))
-
-mock.module("../session-recovery/storage/text-part-injector", () => ({
-  injectTextPartAsync,
-}))
-
 async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
   return import(`./message-builder?test=${Date.now()}-${Math.random()}`)
 }
 
-afterAll(() => {
-  mock.restore()
-})
+function registerModuleMocks(): void {
+  mock.module("../../shared/logger", () => ({
+    log: () => {},
+  }))
+
+  mock.module("../../shared/opencode-storage-detection", () => ({
+    isSqliteBackend: () => true,
+  }))
+
+  mock.module("../session-recovery/storage", () => ({
+    findEmptyMessages: () => [],
+    findMessagesWithEmptyTextParts: () => [],
+    injectTextPart: () => false,
+    replaceEmptyTextParts: () => false,
+  }))
+
+  mock.module("../session-recovery/storage/empty-text", () => ({
+    replaceEmptyTextPartsAsync,
+    findMessagesWithEmptyTextPartsFromSDK,
+  }))
+
+  mock.module("../session-recovery/storage/text-part-injector", () => ({
+    injectTextPartAsync,
+  }))
+}
 
 describe("sanitizeEmptyMessagesBeforeSummarize", () => {
   beforeEach(() => {
+    registerModuleMocks()
     replaceEmptyTextPartsAsync.mockReset()
     replaceEmptyTextPartsAsync.mockResolvedValue(false)
     injectTextPartAsync.mockReset()
     injectTextPartAsync.mockResolvedValue(false)
     findMessagesWithEmptyTextPartsFromSDK.mockReset()
     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   test("#given sqlite message with tool content and empty text part #when sanitizing #then it fixes the mixed-content message", async () => {

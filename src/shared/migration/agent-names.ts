@@ -32,7 +32,6 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   metis: "metis",
   "comment-planner": "metis",
   "Comment Planner": "metis",
-  "Metis (Plan Consultant)": "metis",
   "metis (plan consultant)": "metis",
 
   // Momus variants → "momus"
@@ -48,8 +47,6 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "sisyphus-junior": "sisyphus-junior",
   "canvas-executor": "sisyphus-junior",
   "Canvas Executor": "sisyphus-junior",
-  "Sisyphus-Junior": "sisyphus-junior",
-  "sisyphus-junior": "sisyphus-junior",
 
   // Already lowercase - passthrough
   build: "build",

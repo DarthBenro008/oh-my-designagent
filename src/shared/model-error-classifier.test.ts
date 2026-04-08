@@ -1,18 +1,16 @@
 declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, mock } = require("bun:test")
-
-const readConnectedProvidersCacheMock = mock(() => null)
-
-mock.module("./connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-}))
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
-    readConnectedProvidersCacheMock.mockReturnValue(null)
-    readConnectedProvidersCacheMock.mockClear()
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => null)
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   test("treats overloaded retry messages as retryable", () => {
@@ -42,7 +40,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["anthropic", "nvidia"])
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => ["anthropic", "nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
@@ -53,7 +51,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["nvidia"])
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => ["nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"])
@@ -74,7 +72,7 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => ["provider-x"])
 
     //#when
     const provider = selectFallbackProvider(["provider-y"], "provider-x")

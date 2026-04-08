@@ -1,4 +1,4 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { MessageData } from "./types"
 import { extractMessageIndex } from "./detect-error-type"
 import { findMessageByIndexNeedingThinking, findMessagesWithOrphanThinking, prependThinkingPart } from "./storage"
@@ -7,7 +7,7 @@ import { prependThinkingPartAsync } from "./storage/thinking-prepend"
 import { THINKING_TYPES } from "./constants"
 import { normalizeSDKResponse } from "../../shared"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 
 export async function recoverThinkingBlockOrder(
   client: Client,

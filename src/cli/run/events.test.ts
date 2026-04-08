@@ -5,17 +5,6 @@ import {
   SESSION_BUDGET_ENV_VAR,
 } from "../../shared/session-budget"
 
-mock.module("picocolors", () => ({
-  default: {
-    red: (value: string) => value,
-    green: (value: string) => value,
-    yellow: (value: string) => value,
-    dim: (value: string) => value,
-    cyan: (value: string) => value,
-    bold: (value: string) => value,
-  },
-}))
-
 const { createEventState, processEvents, serializeError } = await import("./events")
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({

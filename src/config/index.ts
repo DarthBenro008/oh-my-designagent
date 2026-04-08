@@ -12,6 +12,8 @@ export type {
   ExperimentalConfig,
   DynamicContextPruningConfig,
   DesignMemoryConfig,
+  DesignMemoryFile,
+  DesignMemoryFileType,
   RalphLoopConfig,
   FigmaCommentResolutionConfig,
   FigmaConfig,

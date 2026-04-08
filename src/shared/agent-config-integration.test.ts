@@ -92,15 +92,15 @@ describe("Agent Config Integration", () => {
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
 
       // then - display names are correct
-      expect(displayNames).toContain("Sisyphus (Ultraworker)")
-      expect(displayNames).toContain("Atlas (Plan Executor)")
+      expect(displayNames).toContain("Solacy (Design Lead)")
+      expect(displayNames).toContain("Comment Conductor")
       expect(displayNames).toContain("Prometheus (Plan Builder)")
-      expect(displayNames).toContain("Metis (Plan Consultant)")
-      expect(displayNames).toContain("Momus (Plan Critic)")
-      expect(displayNames).toContain("oracle")
-      expect(displayNames).toContain("librarian")
-      expect(displayNames).toContain("explore")
-      expect(displayNames).toContain("multimodal-looker")
+      expect(displayNames).toContain("Comment Planner")
+      expect(displayNames).toContain("Vision Reviewer")
+      expect(displayNames).toContain("Design Auditor")
+      expect(displayNames).toContain("Librarian")
+      expect(displayNames).toContain("Explore")
+      expect(displayNames).toContain("Multimodal Looker")
     })
 
     test("handles lowercase keys case-insensitively", () => {
@@ -111,10 +111,10 @@ describe("Agent Config Integration", () => {
       const displayNames = keys.map((key) => getAgentDisplayName(key))
 
       // then - correct display names are returned
-      expect(displayNames[0]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[1]).toBe("Atlas (Plan Executor)")
-      expect(displayNames[2]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[3]).toBe("Atlas (Plan Executor)")
+      expect(displayNames[0]).toBe("Solacy (Design Lead)")
+      expect(displayNames[1]).toBe("Comment Conductor")
+      expect(displayNames[2]).toBe("Solacy (Design Lead)")
+      expect(displayNames[3]).toBe("Comment Conductor")
       expect(displayNames[4]).toBe("Prometheus (Plan Builder)")
       expect(displayNames[5]).toBe("Prometheus (Plan Builder)")
     })
@@ -188,7 +188,7 @@ describe("Agent Config Integration", () => {
       const prometheusDisplay = getAgentDisplayName("prometheus")
 
       // then - display names are correct
-      expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
+      expect(sisyphusDisplay).toBe("Solacy (Design Lead)")
       expect(prometheusDisplay).toBe("Prometheus (Plan Builder)")
 
       // then - config values are preserved
@@ -217,8 +217,8 @@ describe("Agent Config Integration", () => {
       const atlasDisplay = getAgentDisplayName("atlas")
 
       // then - display names are correct
-      expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
-      expect(atlasDisplay).toBe("Atlas (Plan Executor)")
+      expect(sisyphusDisplay).toBe("Solacy (Design Lead)")
+      expect(atlasDisplay).toBe("Comment Conductor")
     })
   })
 })

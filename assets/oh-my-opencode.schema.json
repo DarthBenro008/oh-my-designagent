@@ -35,6 +35,7 @@
           "playwright",
           "agent-browser",
           "dev-browser",
+          "figma-daemon",
           "frontend-ui-ux",
           "git-master"
         ]
@@ -5290,6 +5291,142 @@
       },
       "additionalProperties": false
     },
+    "design_memory": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "docs_first": {
+          "default": true,
+          "type": "boolean"
+        },
+        "docs_root": {
+          "default": "docs",
+          "type": "string"
+        },
+        "docs_globs": {
+          "default": [
+            "**/*.md",
+            "**/*.mdx",
+            "**/*.txt",
+            "**/*.json",
+            "**/*.jsonc",
+            "**/*.yaml",
+            "**/*.yml"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prefer_docs_types": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "design_style",
+              "product_context",
+              "user_behavior",
+              "copy_context",
+              "historical_learnings",
+              "custom"
+            ]
+          }
+        },
+        "auto_load_for_comment_resolution": {
+          "default": true,
+          "type": "boolean"
+        },
+        "max_docs_files": {
+          "default": 4,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "files": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "type": {
+                "default": "custom",
+                "type": "string",
+                "enum": [
+                  "design_style",
+                  "product_context",
+                  "user_behavior",
+                  "copy_context",
+                  "historical_learnings",
+                  "custom"
+                ]
+              },
+              "priority": {
+                "default": 50,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "tags": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_chars": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "required": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "type",
+              "priority",
+              "tags",
+              "required"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "max_chars_per_file": {
+          "default": 2400,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_total_chars": {
+          "default": 9600,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "enabled",
+        "docs_first",
+        "docs_root",
+        "docs_globs",
+        "prefer_docs_types",
+        "auto_load_for_comment_resolution",
+        "max_docs_files",
+        "files",
+        "max_chars_per_file",
+        "max_total_chars"
+      ],
+      "additionalProperties": false
+    },
     "experimental": {
       "type": "object",
       "properties": {
@@ -5446,6 +5583,166 @@
           "maximum": 9007199254740991
         }
       },
+      "additionalProperties": false
+    },
+    "figma": {
+      "type": "object",
+      "properties": {
+        "comment_resolution": {
+          "default": {
+            "enabled": false,
+            "auto_reply": true,
+            "max_variants": 3,
+            "require_review_above_difficulty": "medium",
+            "memory_required_for": [
+              "new_component",
+              "layout_change",
+              "design_improvement"
+            ]
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "auto_reply": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_variants": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "require_review_above_difficulty": {
+              "default": "medium",
+              "type": "string",
+              "enum": [
+                "easy",
+                "medium",
+                "hard"
+              ]
+            },
+            "memory_required_for": {
+              "default": [
+                "new_component",
+                "layout_change",
+                "design_improvement"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "enabled",
+            "auto_reply",
+            "max_variants",
+            "require_review_above_difficulty",
+            "memory_required_for"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "comment_resolution"
+      ],
+      "additionalProperties": false
+    },
+    "figma_use": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "mcp",
+          "type": "string",
+          "enum": [
+            "mcp",
+            "cli"
+          ]
+        },
+        "mcp_server_name": {
+          "default": "figma-daemon",
+          "type": "string"
+        },
+        "require_status_check": {
+          "default": true,
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "mode",
+        "mcp_server_name",
+        "require_status_check"
+      ],
+      "additionalProperties": false
+    },
+    "pipeline": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "confidence_proceed_threshold": {
+          "default": 72,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "confidence_retry_threshold": {
+          "default": 30,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "max_variants": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "post_render_qa_enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "scope_lock_enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "pre_gather_enabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "confidence_proceed_threshold",
+        "confidence_retry_threshold",
+        "max_variants",
+        "post_render_qa_enabled",
+        "scope_lock_enabled",
+        "pre_gather_enabled"
+      ],
       "additionalProperties": false
     },
     "auto_update": {

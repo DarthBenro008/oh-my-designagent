@@ -8,8 +8,10 @@ export const FigmaCommentResolutionConfigSchema = z.object({
   memory_required_for: z.array(z.string()).default(["new_component", "layout_change", "design_improvement"]),
 })
 
+const FIGMA_COMMENT_RESOLUTION_DEFAULTS = FigmaCommentResolutionConfigSchema.parse({})
+
 export const FigmaConfigSchema = z.object({
-  comment_resolution: FigmaCommentResolutionConfigSchema.default({}),
+  comment_resolution: FigmaCommentResolutionConfigSchema.default(FIGMA_COMMENT_RESOLUTION_DEFAULTS),
 })
 
 export type FigmaCommentResolutionConfig = z.infer<typeof FigmaCommentResolutionConfigSchema>

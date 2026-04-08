@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -51,6 +51,10 @@ function resetTestCache(): void {
 }
 
 describe("invalidatePackage", () => {
+  afterAll(() => {
+    mock.restore()
+  })
+
   beforeEach(() => {
     resetTestCache()
   })

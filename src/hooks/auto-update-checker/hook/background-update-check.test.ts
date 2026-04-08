@@ -1,5 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
+
+const originalCheckerModule = await import("../checker.ts?restore")
 
 type PluginEntry = {
   entry: string
@@ -36,6 +38,7 @@ const mockShowAutoUpdatedToast = mock(
 const mockSyncCachePackageJsonToIntent = mock(() => false)
 
 mock.module("../checker", () => ({
+  ...originalCheckerModule,
   findPluginEntry: mockFindPluginEntry,
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
@@ -55,6 +58,10 @@ const modulePath = "./background-update-check?test"
 const { runBackgroundUpdateCheck } = await import(modulePath)
 
 describe("runBackgroundUpdateCheck", () => {
+  afterAll(() => {
+    mock.restore()
+  })
+
   const mockCtx = { directory: "/test" } as PluginInput
   const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
     isUpdate ? `Update to ${version}` : "Up to date"

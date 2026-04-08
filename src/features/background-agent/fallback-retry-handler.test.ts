@@ -1,21 +1,7 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
-
-mock.module("../../shared", () => ({
-  log: mock(() => {}),
-  readConnectedProvidersCache: mock(() => null),
-  readProviderModelsCache: mock(() => null),
-}))
-
-mock.module("../../shared/model-error-classifier", () => ({
-  shouldRetryError: mock(() => true),
-  getNextFallback: mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt]),
-  hasMoreFallbacks: mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length),
-  selectFallbackProvider: mock((providers: string[]) => providers[0]),
-}))
-
-mock.module("../../shared/provider-model-id-transform", () => ({
-  transformModelForProvider: mock((_provider: string, model: string) => model),
-}))
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as shared from "../../shared"
+import * as modelErrorClassifier from "../../shared/model-error-classifier"
+import * as providerModelIdTransform from "../../shared/provider-model-id-transform"
 
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { shouldRetryError } from "../../shared/model-error-classifier"
@@ -82,14 +68,19 @@ function createDefaultArgs(taskOverrides: Partial<BackgroundTask> = {}) {
 }
 
 describe("tryFallbackRetry", () => {
-  afterAll(() => {
-    mock.restore()
+  beforeEach(() => {
+    spyOn(shared, "log").mockImplementation(() => {})
+    spyOn(shared, "readConnectedProvidersCache").mockImplementation(() => null)
+    spyOn(shared, "readProviderModelsCache").mockImplementation(() => null)
+    spyOn(modelErrorClassifier, "shouldRetryError").mockImplementation(() => true)
+    spyOn(modelErrorClassifier, "getNextFallback").mockImplementation((chain: Array<{ model: string }>, attempt: number) => chain[attempt] as never)
+    spyOn(modelErrorClassifier, "hasMoreFallbacks").mockImplementation((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
+    spyOn(modelErrorClassifier, "selectFallbackProvider").mockImplementation((providers: string[]) => providers[0] as never)
+    spyOn(providerModelIdTransform, "transformModelForProvider").mockImplementation((_provider: string, model: string) => model)
   })
 
-  beforeEach(() => {
-    ;(shouldRetryError as any).mockImplementation(() => true)
-    ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
-    ;(readProviderModelsCache as any).mockReturnValue(null)
+  afterEach(() => {
+    mock.restore()
   })
 
   describe("#given retryable error with fallback chain", () => {

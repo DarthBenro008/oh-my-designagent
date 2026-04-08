@@ -1,4 +1,4 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { MessageData } from "./types"
 import { findMessagesWithThinkingBlocks, stripThinkingParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
@@ -7,7 +7,7 @@ import { THINKING_TYPES } from "./constants"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 
 export async function recoverThinkingDisabledViolation(
   client: Client,

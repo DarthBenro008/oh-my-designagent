@@ -232,7 +232,7 @@ Comment resolution protocol:
 ${buildThreadingProtocolSection()}`,
     permission: {
       question: "allow",
-    },
+    } as AgentConfig["permission"],
     skills: ctx.figmaUseEnabled
       ? ["figma-daemon", "design-pipeline"]
       : undefined,
@@ -287,7 +287,7 @@ For new_component and design_improvement tasks:
     permission: {
       question: "allow",
       call_omo_agent: "deny",
-    },
+    } as AgentConfig["permission"],
     skills: ctx.figmaUseEnabled ? ["figma-daemon"] : undefined,
   };
 
@@ -394,7 +394,7 @@ ${buildThreadingProtocolSection()}`,
     permission: {
       question: "allow",
       call_omo_agent: "deny",
-    },
+    } as AgentConfig["permission"],
     skills: maybeSkillList(ctx.figmaUseEnabled),
   };
 

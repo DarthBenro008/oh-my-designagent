@@ -194,6 +194,11 @@ describe("normalizeAgentForPrompt", () => {
   it("strips atlas UI ordering prefix back to canonical display name", () => {
     expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Comment Conductor")
   })
+
+  it("canonicalizes legacy display names to the current prompt display name", () => {
+    expect(normalizeAgentForPrompt("Atlas (Plan Executor)")).toBe("Comment Conductor")
+    expect(normalizeAgentForPrompt("Sisyphus (Ultraworker)")).toBe("Solacy (Design Lead)")
+  })
 })
 
 describe("AGENT_DISPLAY_NAMES", () => {

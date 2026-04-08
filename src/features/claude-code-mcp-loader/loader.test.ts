@@ -7,6 +7,7 @@ import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 const TEST_HOME = join(TEST_DIR, "home")
+const originalSharedModule = await import("../../shared/index.ts?restore")
 
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
@@ -17,6 +18,7 @@ describe("getSystemMcpServerNames", () => {
       tmpdir,
     }))
     mock.module("../../shared", () => ({
+      ...originalSharedModule,
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
   })

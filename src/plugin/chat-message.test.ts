@@ -8,6 +8,7 @@ import { createChatMessageHandler } from "./chat-message"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createStartWorkHook } from "../hooks/start-work"
 import { readBoulderState } from "../features/boulder-state"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 
@@ -86,7 +87,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
     await handler(input, output)
 
     // then
-    expect(output.message["agent"]).toBe("Sisyphus (Ultraworker)")
+    expect(output.message["agent"]).toBe(getAgentDisplayName("sisyphus"))
     expect(output.parts[0].text).toContain("<auto-slash-command>")
     expect(output.parts[0].text).toContain("Auto-Selected Plan")
     expect(output.parts[0].text).toContain("boulder.json has been created")

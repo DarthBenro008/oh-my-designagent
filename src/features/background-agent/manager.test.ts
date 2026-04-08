@@ -1,14 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-  hasConnectedProvidersCache: () => false,
-  hasProviderModelsCache: () => false,
-  writeProviderModelsCache: () => {},
-  updateConnectedProvidersCache: () => {},
-}))
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
@@ -17,6 +9,7 @@ import type { BackgroundTask, ResumeInput } from "./types"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
+import { _resetForTesting as resetProcessCleanupForTesting } from "./process-cleanup"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
 
 
@@ -269,6 +262,19 @@ function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
 function getListenerCounts(signals: Array<NodeJS.Signals | "beforeExit" | "exit">): Record<string, number> {
   return Object.fromEntries(signals.map((signal) => [signal, process.listenerCount(signal)]))
 }
+
+beforeEach(() => {
+  spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => null)
+  spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(() => null)
+  spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(() => false)
+  spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(() => false)
+  spyOn(connectedProvidersCache, "writeProviderModelsCache").mockImplementation(() => {})
+  spyOn(connectedProvidersCache, "updateConnectedProvidersCache").mockImplementation(() => {})
+})
+
+afterEach(() => {
+  mock.restore()
+})
 
 
 describe("BackgroundManager.getAllDescendantTasks", () => {
@@ -1772,7 +1778,15 @@ describe("BackgroundManager.resume model persistence", () => {
 })
 
 describe("BackgroundManager process cleanup", () => {
-  test("should remove listeners after last shutdown", () => {
+  beforeEach(() => {
+    resetProcessCleanupForTesting()
+  })
+
+  afterEach(() => {
+    resetProcessCleanupForTesting()
+  })
+
+  test("should remove listeners after last shutdown", async () => {
     // given
     const signals = getCleanupSignals()
     const baseline = getListenerCounts(signals)
@@ -1781,9 +1795,9 @@ describe("BackgroundManager process cleanup", () => {
 
     // when
     const afterCreate = getListenerCounts(signals)
-    managerA.shutdown()
+    await managerA.shutdown()
     const afterFirstShutdown = getListenerCounts(signals)
-    managerB.shutdown()
+    await managerB.shutdown()
     const afterSecondShutdown = getListenerCounts(signals)
 
     // then

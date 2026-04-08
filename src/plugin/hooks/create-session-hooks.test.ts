@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
@@ -6,50 +6,7 @@ import {
   _resetSessionBudgetStateForTesting,
   SESSION_BUDGET_ENV_VAR,
 } from "../../shared/session-budget"
-
-mock.module("../../hooks", () => ({
-  createContextWindowMonitorHook: () => ({ event: async () => {} }),
-  createSessionRecoveryHook: () => ({ event: async () => {} }),
-  createSessionNotification: () => ({ event: async () => {} }),
-  createThinkModeHook: () => ({ event: async () => {} }),
-  createModelFallbackHook: () => ({ event: async () => {} }),
-  createAnthropicContextWindowLimitRecoveryHook: () => ({ event: async () => {} }),
-  createAutoUpdateCheckerHook: () => ({ event: async () => {} }),
-  createAgentUsageReminderHook: () => ({ event: async () => {} }),
-  createBudgetEnforcerHook: () => ({ event: async () => {} }),
-  createNonInteractiveEnvHook: () => ({ event: async () => {} }),
-  createInteractiveBashSessionHook: () => ({ event: async () => {} }),
-  createRalphLoopHook: () => ({ event: async () => {} }),
-  createEditErrorRecoveryHook: () => ({ event: async () => {} }),
-  createDelegateTaskRetryHook: () => ({ event: async () => {} }),
-  createTaskResumeInfoHook: () => ({ event: async () => {} }),
-  createStartWorkHook: () => ({ event: async () => {} }),
-  createPrometheusMdOnlyHook: () => ({ event: async () => {} }),
-  createSisyphusJuniorNotepadHook: () => ({ event: async () => {} }),
-  createNoSisyphusGptHook: () => ({ event: async () => {} }),
-  createNoHephaestusNonGptHook: () => ({ event: async () => {} }),
-  createQuestionLabelTruncatorHook: () => ({ event: async () => {} }),
-  createPreemptiveCompactionHook: () => ({ event: async () => {} }),
-  createRuntimeFallbackHook: () => ({ event: async () => {} }),
-  createLegacyPluginToastHook: () => ({ event: async () => {} }),
-}))
-
-mock.module("../../hooks/anthropic-effort", () => ({
-  createAnthropicEffortHook: () => ({ event: async () => {} }),
-}))
-
-mock.module("../../shared", () => ({
-  detectExternalNotificationPlugin: () => ({ detected: false, pluginName: null }),
-  getNotificationConflictWarning: () => "",
-  log: () => {},
-  normalizeSDKResponse: (_response: unknown, fallback: unknown) => fallback,
-}))
-
-mock.module("../../tools", () => ({
-  sessionExists: async () => true,
-}))
-
-const { createSessionHooks } = await import("./create-session-hooks")
+import { createSessionHooks } from "./create-session-hooks"
 
 const mockContext = {
   directory: "/tmp",

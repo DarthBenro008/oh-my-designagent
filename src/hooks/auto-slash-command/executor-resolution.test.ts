@@ -1,33 +1,8 @@
-import { describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-
-mock.module("../../shared", () => ({
-  resolveCommandsInText: async (content: string) => content,
-  resolveFileReferencesInText: async (content: string) => content,
-}))
-
-mock.module("../../tools/slashcommand", () => ({
-  discoverCommandsSync: () => [
-    {
-      name: "shadowed",
-      metadata: { name: "shadowed", description: "builtin" },
-      content: "builtin template",
-      scope: "builtin",
-    },
-    {
-      name: "shadowed",
-      metadata: { name: "shadowed", description: "project" },
-      content: "project template",
-      scope: "project",
-    },
-  ],
-}))
-
-mock.module("../../features/opencode-skill-loader", () => ({
-  discoverAllSkills: async (): Promise<LoadedSkill[]> => [],
-}))
-
-const { executeSlashCommand } = await import("./executor")
+import * as shared from "../../shared"
+import * as slashcommand from "../../tools/slashcommand"
+import { executeSlashCommand } from "./executor"
 
 function createRestrictedSkill(): LoadedSkill {
   return {
@@ -43,6 +18,29 @@ function createRestrictedSkill(): LoadedSkill {
 }
 
 describe("executeSlashCommand resolution semantics", () => {
+  beforeEach(() => {
+    spyOn(shared, "resolveCommandsInText").mockImplementation(async (content: string) => content)
+    spyOn(shared, "resolveFileReferencesInText").mockImplementation(async (content: string) => content)
+    spyOn(slashcommand, "discoverCommandsSync").mockImplementation(() => [
+      {
+        name: "shadowed",
+        metadata: { name: "shadowed", description: "builtin" },
+        content: "builtin template",
+        scope: "builtin",
+      },
+      {
+        name: "shadowed",
+        metadata: { name: "shadowed", description: "project" },
+        content: "project template",
+        scope: "project",
+      },
+    ])
+  })
+
+  afterEach(() => {
+    mock.restore()
+  })
+
   it("returns project command when project and builtin names collide", async () => {
     //#given
     const parsed = {

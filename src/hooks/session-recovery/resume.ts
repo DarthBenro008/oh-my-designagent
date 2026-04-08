@@ -1,10 +1,10 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { MessageData, ResumeConfig } from "./types"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 
 export function findLastUserMessage(messages: MessageData[]): MessageData | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {

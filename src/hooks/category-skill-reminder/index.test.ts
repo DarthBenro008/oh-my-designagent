@@ -74,8 +74,8 @@ describe("category-skill-reminder hook", () => {
       clearSessionAgent(sessionID)
     })
 
-    test("should inject reminder for sisyphus-junior agent", async () => {
-      // given - sisyphus-junior agent session
+    test("should NOT inject reminder for sisyphus-junior agent", async () => {
+      // given - sisyphus-junior is an execution subagent, not an orchestrator
       const hook = createHook()
       const sessionID = "junior-session"
       updateSessionAgent(sessionID, "sisyphus-junior")
@@ -87,8 +87,8 @@ describe("category-skill-reminder hook", () => {
       await hook["tool.execute.after"]({ tool: "write", sessionID, callID: "2" }, output)
       await hook["tool.execute.after"]({ tool: "write", sessionID, callID: "3" }, output)
 
-      // then - reminder should be injected
-      expect(output.output).toContain("[Category+Skill Reminder]")
+      // then - reminder should NOT be injected
+      expect(output.output).not.toContain("[Category+Skill Reminder]")
 
       clearSessionAgent(sessionID)
     })

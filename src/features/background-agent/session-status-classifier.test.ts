@@ -1,8 +1,17 @@
-import { describe, test, expect, mock } from "bun:test"
+import { afterEach, beforeEach, describe, test, expect, mock, spyOn } from "bun:test"
+import * as shared from "../../shared"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 
 const mockLog = mock()
-mock.module("../../shared", () => ({ log: mockLog }))
+
+beforeEach(() => {
+  spyOn(shared, "log").mockImplementation(mockLog)
+})
+
+afterEach(() => {
+  mockLog.mockReset()
+  mock.restore()
+})
 
 describe("isActiveSessionStatus", () => {
   describe("#given a known active session status", () => {

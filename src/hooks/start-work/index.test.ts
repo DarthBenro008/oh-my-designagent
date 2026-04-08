@@ -472,7 +472,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(output.message.agent).toBe(getAgentListDisplayName("sisyphus"))
       expect(sessionState.getSessionAgent("ses-prometheus-to-sisyphus")).toBe("sisyphus")
     })
 
@@ -500,7 +500,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(output.message.agent).toBe(getAgentListDisplayName("sisyphus"))
       expect(sessionState.getSessionAgent("ses-prometheus-to-worker")).toBe("sisyphus")
       expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     })
@@ -535,7 +535,7 @@ You are starting a Sisyphus work session.
       )
 
       // then
-      expect(output.message.agent).toBe("Sisyphus (Ultraworker)")
+      expect(output.message.agent).toBe(getAgentListDisplayName("sisyphus"))
       expect(readBoulderState(testDir)?.agent).toBe("sisyphus")
     })
   })

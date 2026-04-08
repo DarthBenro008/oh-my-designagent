@@ -11,8 +11,12 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   resetSqliteBackendCache: () => {},
 }))
 
-const { createPrometheusMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
+let createPrometheusMdOnlyHook: typeof import("./index").createPrometheusMdOnlyHook
+
+async function importFreshPrometheusMdOnly(): Promise<typeof import("./index")> {
+  return import(`./index?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("prometheus-md-only", () => {
   const TEST_SESSION_ID = "ses_test_prometheus"
@@ -37,6 +41,10 @@ describe("prometheus-md-only", () => {
       JSON.stringify(messageContent)
     )
   }
+
+  beforeEach(async () => {
+    ;({ createPrometheusMdOnlyHook } = await importFreshPrometheusMdOnly())
+  })
 
   afterEach(() => {
     clearSessionAgent(TEST_SESSION_ID)

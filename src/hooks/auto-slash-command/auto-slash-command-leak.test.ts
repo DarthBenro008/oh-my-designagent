@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { AUTO_SLASH_COMMAND_TAG_OPEN } from "./constants"
 import type {
   AutoSlashCommandHookInput,
@@ -7,6 +7,7 @@ import type {
   CommandExecuteBeforeOutput,
 } from "./types"
 import * as shared from "../../shared"
+import { createAutoSlashCommandHook } from "./hook"
 
 const executeSlashCommandMock = mock(
   async (parsed: { command: string; args: string; raw: string }) => ({
@@ -15,13 +16,7 @@ const executeSlashCommandMock = mock(
   })
 )
 
-mock.module("./executor", () => ({
-  executeSlashCommand: executeSlashCommandMock,
-}))
-
-const logMock = spyOn(shared, "log").mockImplementation(() => {})
-
-const { createAutoSlashCommandHook } = await import("./hook")
+let logMock: ReturnType<typeof spyOn>
 
 function createChatInput(sessionID: string, messageID: string): AutoSlashCommandHookInput {
   return {
@@ -52,8 +47,17 @@ function createCommandOutput(text: string): CommandExecuteBeforeOutput {
 }
 
 describe("createAutoSlashCommandHook leak prevention", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   beforeEach(() => {
-    executeSlashCommandMock.mockClear()
+    logMock = spyOn(shared, "log").mockImplementation(() => {})
+    executeSlashCommandMock.mockReset()
+    executeSlashCommandMock.mockImplementation(async (parsed) => ({
+      success: true,
+      replacementText: parsed.raw,
+    }))
     logMock.mockClear()
   })
 
@@ -63,7 +67,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
         //#given
         const nowSpy = spyOn(Date, "now")
         try {
-          const hook = createAutoSlashCommandHook()
+          const hook = createAutoSlashCommandHook({ executeSlashCommandImpl: executeSlashCommandMock })
           const input = createCommandInput("session-dedup", "leak-test-command")
           const firstOutput = createCommandOutput("first")
           const secondOutput = createCommandOutput("second")
@@ -89,7 +93,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
         //#given
         const nowSpy = spyOn(Date, "now")
         try {
-          const hook = createAutoSlashCommandHook()
+          const hook = createAutoSlashCommandHook({ executeSlashCommandImpl: executeSlashCommandMock })
           const input = createCommandInput("session-dedup", "leak-test-command")
           const firstOutput = createCommandOutput("first")
           const secondOutput = createCommandOutput("second")
@@ -115,7 +119,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
         //#given
         const nowSpy = spyOn(Date, "now")
         try {
-          const hook = createAutoSlashCommandHook()
+          const hook = createAutoSlashCommandHook({ executeSlashCommandImpl: executeSlashCommandMock })
           const input: CommandExecuteBeforeInput = {
             ...createCommandInput("session-dedup", "leak-test-command"),
             eventID: "event-1",
@@ -143,7 +147,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
   describe("#given hook with entries from multiple sessions", () => {
     describe("#when dispose() is called", () => {
       it("#then both Sets are empty", async () => {
-        const hook = createAutoSlashCommandHook()
+        const hook = createAutoSlashCommandHook({ executeSlashCommandImpl: executeSlashCommandMock })
         await hook["chat.message"](
           createChatInput("session-chat", "message-chat"),
           createChatOutput("/leak-chat")
@@ -178,7 +182,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
   describe("#given Set with more than 10000 entries", () => {
     describe("#when new entry added", () => {
       it("#then Set size is reduced", async () => {
-        const hook = createAutoSlashCommandHook()
+        const hook = createAutoSlashCommandHook({ executeSlashCommandImpl: executeSlashCommandMock })
         const oldestInput = createChatInput("session-oldest", "message-oldest")
         await hook["chat.message"](oldestInput, createChatOutput("/leak-oldest"))
 

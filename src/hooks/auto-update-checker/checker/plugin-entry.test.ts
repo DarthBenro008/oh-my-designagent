@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { findPluginEntry } from "./plugin-entry"
+
+async function importFreshPluginEntry(): Promise<typeof import("./plugin-entry")> {
+  return import(`./plugin-entry?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("findPluginEntry", () => {
   let temporaryDirectory: string
@@ -19,11 +22,12 @@ describe("findPluginEntry", () => {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true })
   })
 
-  test("returns unpinned for bare package name", () => {
+  test("returns unpinned for bare package name", async () => {
     // #given plugin is configured without a tag
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode"] }))
 
     // #when plugin entry is detected
+    const { findPluginEntry } = await importFreshPluginEntry()
     const pluginInfo = findPluginEntry(temporaryDirectory)
 
     // #then entry is not pinned
@@ -32,11 +36,12 @@ describe("findPluginEntry", () => {
     expect(pluginInfo?.pinnedVersion).toBeNull()
   })
 
-  test("returns unpinned for latest dist-tag", () => {
+  test("returns unpinned for latest dist-tag", async () => {
     // #given plugin is configured with latest dist-tag
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@latest"] }))
 
     // #when plugin entry is detected
+    const { findPluginEntry } = await importFreshPluginEntry()
     const pluginInfo = findPluginEntry(temporaryDirectory)
 
     // #then latest is treated as channel, not pin
@@ -45,11 +50,12 @@ describe("findPluginEntry", () => {
     expect(pluginInfo?.pinnedVersion).toBe("latest")
   })
 
-  test("returns unpinned for beta dist-tag", () => {
+  test("returns unpinned for beta dist-tag", async () => {
     // #given plugin is configured with beta dist-tag
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@beta"] }))
 
     // #when plugin entry is detected
+    const { findPluginEntry } = await importFreshPluginEntry()
     const pluginInfo = findPluginEntry(temporaryDirectory)
 
     // #then beta is treated as channel, not pin
@@ -58,11 +64,12 @@ describe("findPluginEntry", () => {
     expect(pluginInfo?.pinnedVersion).toBe("beta")
   })
 
-  test("returns pinned for explicit semver", () => {
+  test("returns pinned for explicit semver", async () => {
     // #given plugin is configured with explicit version
     fs.writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@3.5.2"] }))
 
     // #when plugin entry is detected
+    const { findPluginEntry } = await importFreshPluginEntry()
     const pluginInfo = findPluginEntry(temporaryDirectory)
 
     // #then explicit semver is treated as pin

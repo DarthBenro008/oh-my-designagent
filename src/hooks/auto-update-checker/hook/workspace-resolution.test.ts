@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+const originalCheckerModule = await import("../checker.ts?restore")
+const originalCacheModule = await import("../cache.ts?restore")
+const originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+const originalXdgCacheHome = process.env.XDG_CACHE_HOME
+
 type PluginEntry = {
   entry: string
   isPinned: boolean
@@ -23,13 +28,12 @@ function createPluginEntry(overrides?: Partial<PluginEntry>): PluginEntry {
 }
 
 const TEST_DIR = join(import.meta.dir, "__test-workspace-resolution__")
-const TEST_CACHE_DIR = join(TEST_DIR, "cache")
+const TEST_CACHE_DIR = join(TEST_DIR, "opencode")
 const TEST_CONFIG_DIR = join(TEST_DIR, "config")
 
 const mockFindPluginEntry = mock((_directory: string): PluginEntry | null => createPluginEntry())
 const mockGetCachedVersion = mock((): string | null => "3.4.0")
 const mockGetLatestVersion = mock(async (): Promise<string | null> => "3.5.0")
-const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {}
@@ -45,81 +49,52 @@ const mockRunBunInstallWithDetails = mock(
   }
 )
 
-mock.module("../checker", () => ({
-  findPluginEntry: mockFindPluginEntry,
-  getCachedVersion: mockGetCachedVersion,
-  getLatestVersion: mockGetLatestVersion,
-  revertPinnedVersion: mock(() => false),
-  syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
-}))
-mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
-mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-mock.module("../../../cli/config-manager", () => ({
-  runBunInstallWithDetails: mockRunBunInstallWithDetails,
-}))
-mock.module("./update-toasts", () => ({
-  showUpdateAvailableToast: mockShowUpdateAvailableToast,
-  showAutoUpdatedToast: mockShowAutoUpdatedToast,
-}))
-mock.module("../../../shared/logger", () => ({ log: () => {} }))
-mock.module("../../../shared", () => ({
-  getOpenCodeCacheDir: () => TEST_CACHE_DIR,
-  getOpenCodeConfigPaths: () => ({
-    configDir: TEST_CONFIG_DIR,
-    configJson: join(TEST_CONFIG_DIR, "opencode.json"),
-    configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
-    packageJson: join(TEST_CONFIG_DIR, "package.json"),
-    omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
-  }),
-  getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
-}))
+async function importFreshBackgroundUpdateCheck(): Promise<typeof import("./background-update-check")> {
+  return import(`./background-update-check?test=${Date.now()}-${Math.random()}`)
+}
 
-// Mock constants BEFORE importing the module
-const ORIGINAL_PACKAGE_NAME = "oh-my-opencode"
-mock.module("../constants", () => ({
-  PACKAGE_NAME: ORIGINAL_PACKAGE_NAME,
-  CACHE_DIR: TEST_CACHE_DIR,
-  USER_CONFIG_DIR: TEST_CONFIG_DIR,
-}))
-
-// Need to mock getOpenCodeCacheDir and getOpenCodeConfigPaths before importing the module
-mock.module("../../../shared/data-path", () => ({
-  getDataDir: () => join(TEST_DIR, "data"),
-  getOpenCodeStorageDir: () => join(TEST_DIR, "data", "opencode", "storage"),
-  getCacheDir: () => TEST_DIR,
-  getOmoOpenCodeCacheDir: () => join(TEST_DIR, "oh-my-opencode"),
-  getOpenCodeCacheDir: () => TEST_CACHE_DIR,
-}))
-mock.module("../../../shared/opencode-config-dir", () => ({
-  getOpenCodeConfigDir: () => TEST_CONFIG_DIR,
-  getOpenCodeConfigPaths: () => ({
-    configDir: TEST_CONFIG_DIR,
-    configJson: join(TEST_CONFIG_DIR, "opencode.json"),
-    configJsonc: join(TEST_CONFIG_DIR, "opencode.jsonc"),
-    packageJson: join(TEST_CONFIG_DIR, "package.json"),
-    omoConfig: join(TEST_CONFIG_DIR, "oh-my-opencode.json"),
-  }),
-}))
-
-const modulePath = "./background-update-check?test"
-const { runBackgroundUpdateCheck } = await import(modulePath)
+function registerModuleMocks(): void {
+  mock.module("../checker", () => ({
+    ...originalCheckerModule,
+    findPluginEntry: mockFindPluginEntry,
+    getCachedVersion: mockGetCachedVersion,
+    getLatestVersion: mockGetLatestVersion,
+    revertPinnedVersion: mock(() => false),
+    syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+  }))
+  mock.module("../cache", () => ({
+    ...originalCacheModule,
+    invalidatePackage: mockInvalidatePackage,
+  }))
+  mock.module("../../../cli/config-manager", () => ({
+    runBunInstallWithDetails: mockRunBunInstallWithDetails,
+  }))
+  mock.module("./update-toasts", () => ({
+    showUpdateAvailableToast: mockShowUpdateAvailableToast,
+    showAutoUpdatedToast: mockShowAutoUpdatedToast,
+  }))
+  mock.module("../../../shared/logger", () => ({ log: () => {} }))
+}
 
 describe("workspace resolution", () => {
+  let runBackgroundUpdateCheck: typeof import("./background-update-check")["runBackgroundUpdateCheck"]
   const mockCtx = { directory: "/test" } as PluginInput
   const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
     isUpdate ? `Update to ${version}` : "Up to date"
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Setup test directories
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
     mkdirSync(TEST_DIR, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
+    process.env.XDG_CACHE_HOME = TEST_DIR
+    registerModuleMocks()
 
     mockFindPluginEntry.mockReset()
     mockGetCachedVersion.mockReset()
     mockGetLatestVersion.mockReset()
-    mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
     mockRunBunInstallWithDetails.mockReset()
     mockShowUpdateAvailableToast.mockReset()
@@ -128,12 +103,23 @@ describe("workspace resolution", () => {
     mockFindPluginEntry.mockReturnValue(createPluginEntry())
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
-    mockExtractChannel.mockReturnValue("latest")
     // Note: Don't use mockResolvedValue here - it overrides the function that captures args
     mockSyncCachePackageJsonToIntent.mockReturnValue({ synced: true, error: null })
+    ;({ runBackgroundUpdateCheck } = await importFreshBackgroundUpdateCheck())
   })
 
   afterEach(() => {
+    mock.restore()
+    if (originalOpencodeConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    }
+    if (originalXdgCacheHome === undefined) {
+      delete process.env.XDG_CACHE_HOME
+    } else {
+      process.env.XDG_CACHE_HOME = originalXdgCacheHome
+    }
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }

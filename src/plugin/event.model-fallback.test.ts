@@ -1,16 +1,23 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
-
-mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-}))
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
-import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
+let createModelFallbackHook: typeof import("../hooks/model-fallback/hook").createModelFallbackHook
+let clearPendingModelFallback: typeof import("../hooks/model-fallback/hook").clearPendingModelFallback
+
+async function importFreshModelFallbackHook(): Promise<typeof import("../hooks/model-fallback/hook")> {
+  return import(`../hooks/model-fallback/hook?test=${Date.now()}-${Math.random()}`)
+}
 describe("createEventHandler - model fallback", () => {
+  beforeEach(async () => {
+    ;({ createModelFallbackHook, clearPendingModelFallback } = await importFreshModelFallbackHook())
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => null)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(() => null)
+  })
+
   const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
@@ -52,6 +59,7 @@ describe("createEventHandler - model fallback", () => {
   }
 
   afterEach(() => {
+    mock.restore()
     _resetForTesting()
   })
 

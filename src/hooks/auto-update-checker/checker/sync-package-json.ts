@@ -1,8 +1,9 @@
 import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { CACHE_DIR, PACKAGE_NAME } from "../constants"
+import { PACKAGE_NAME } from "../constants"
 import { log } from "../../../shared/logger"
+import { getOpenCodeCacheDir } from "../../../shared/data-path"
 import type { PluginEntryInfo } from "./plugin-entry"
 
 interface CachePackageJson {
@@ -33,7 +34,7 @@ function getIntentVersion(pluginInfo: PluginEntryInfo): string {
 }
 
 export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncResult {
-  const cachePackageJsonPath = path.join(CACHE_DIR, "package.json")
+  const cachePackageJsonPath = path.join(getOpenCodeCacheDir(), "package.json")
 
   if (!fs.existsSync(cachePackageJsonPath)) {
     log("[auto-update-checker] Cache package.json not found, nothing to sync")

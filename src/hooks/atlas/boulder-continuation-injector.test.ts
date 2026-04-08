@@ -46,7 +46,7 @@ describe("injectBoulderContinuation", () => {
     expect(promptAsyncMock).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          agent: "Atlas (Plan Executor)",
+          agent: "Comment Conductor",
         }),
       }),
     )

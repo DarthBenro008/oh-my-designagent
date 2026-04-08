@@ -217,6 +217,10 @@ export function createModelFallbackHook(args?: { toast?: FallbackToast; onApplie
   const onApplied = args?.onApplied
 
   return {
+    setPendingFallback: setPendingModelFallback,
+    clearPendingFallback: clearPendingModelFallback,
+    setFallbackChain: setSessionFallbackChain,
+    clearFallbackChain: clearSessionFallbackChain,
     "chat.message": async (
       input: ChatMessageInput,
       output: ChatMessageHandlerOutput,

@@ -3,7 +3,7 @@ import {
   extractPromptText,
   findSlashCommandPartIndex,
 } from "./detector"
-import { executeSlashCommand, type ExecutorOptions } from "./executor"
+import { executeSlashCommand, type ExecuteResult, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
@@ -69,6 +69,10 @@ export interface AutoSlashCommandHookOptions {
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
   directory?: string
+  executeSlashCommandImpl?: (
+    parsed: { command: string; args: string; raw: string },
+    options?: ExecutorOptions,
+  ) => Promise<ExecuteResult>
 }
 
 export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
@@ -78,6 +82,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     enabledPluginsOverride: options?.enabledPluginsOverride,
     directory: options?.directory,
   }
+  const runSlashCommand = options?.executeSlashCommandImpl ?? executeSlashCommand
   const sessionProcessedCommands = createProcessedCommandStore()
   const sessionProcessedCommandExecutions = createProcessedCommandStore()
 
@@ -132,7 +137,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         agent: input.agent,
       }
 
-      const result = await executeSlashCommand(parsed, executionOptions)
+      const result = await runSlashCommand(parsed, executionOptions)
 
       const idx = findSlashCommandPartIndex(output.parts)
       if (idx < 0) {
@@ -186,7 +191,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         agent: input.agent,
       }
 
-      const result = await executeSlashCommand(parsed, executionOptions)
+      const result = await runSlashCommand(parsed, executionOptions)
 
       if (!result.success || !result.replacementText) {
         log(`[auto-slash-command] command.execute.before - command not found in our executor`, {

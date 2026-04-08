@@ -29,7 +29,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-6")
-      expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect(agents.sisyphus.thinking).toBeUndefined()
       expect(agents.sisyphus.reasoningEffort).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
@@ -49,7 +49,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.4")
-    expect(agents.sisyphus.reasoningEffort).toBe("medium")
+    expect(agents.sisyphus.reasoningEffort).toBeUndefined()
     expect(agents.sisyphus.thinking).toBeUndefined()
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
@@ -181,7 +181,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
      // #then - oracle resolves via connected cache fallback to openai/gpt-5.4 (not system default)
      expect(agents.oracle.model).toBe("openai/gpt-5.4")
-     expect(agents.oracle.reasoningEffort).toBe("medium")
+     expect(agents.oracle.reasoningEffort).toBeUndefined()
      expect(agents.oracle.thinking).toBeUndefined()
      cacheSpy.mockRestore?.()
      providerModelsSpy.mockRestore()
@@ -201,7 +201,7 @@ describe("createBuiltinAgents with model overrides", () => {
      cacheSpy.mockRestore?.()
    })
 
-  test("Oracle with GPT model override has reasoningEffort, no thinking", async () => {
+  test("Oracle with GPT model override uses design auditor defaults", async () => {
     // #given
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
@@ -214,14 +214,14 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.oracle.model).toBe("openai/gpt-5.4")
-    expect(agents.oracle.reasoningEffort).toBe("medium")
-    expect(agents.oracle.textVerbosity).toBe("high")
+    expect(agents.oracle.reasoningEffort).toBeUndefined()
+    expect(agents.oracle.textVerbosity).toBeUndefined()
     expect(agents.oracle.thinking).toBeUndefined()
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
   })
 
-  test("Oracle with Claude model override has thinking, no reasoningEffort", async () => {
+  test("Oracle with Claude model override uses design auditor defaults", async () => {
     // #given
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
@@ -234,7 +234,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.oracle.model).toBe("anthropic/claude-sonnet-4")
-    expect(agents.oracle.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+    expect(agents.oracle.thinking).toBeUndefined()
     expect(agents.oracle.reasoningEffort).toBeUndefined()
     expect(agents.oracle.textVerbosity).toBeUndefined()
     providerModelsSpy.mockRestore()
@@ -271,8 +271,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.sisyphus.prompt).not.toContain("playwright")
-    expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
-    expect(agents.sisyphus.prompt).toContain("git-master")
+    expect(agents.sisyphus.prompt).toContain("visual-engineering")
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
     fetchSpy.mockRestore()

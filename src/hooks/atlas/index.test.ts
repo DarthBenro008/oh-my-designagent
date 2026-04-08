@@ -10,6 +10,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import type { PendingTaskRef } from "./types"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
@@ -1679,11 +1680,11 @@ session_id: ses_untrusted_999
        // then - should call prompt for sisyphus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
-       expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
+       expect(callArgs.body.agent).toBe(getAgentDisplayName("sisyphus"))
      })
 
-    test("should preserve display-name agent in continuation prompt when boulder agent uses display form", async () => {
-      // given - boulder state uses display-form agent name
+    test("should canonicalize legacy display-form agents in continuation prompts", async () => {
+      // given - boulder state uses a legacy display-form agent name
       const planPath = join(TEST_DIR, "test-plan.md")
       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -1711,7 +1712,7 @@ session_id: ses_untrusted_999
       // then
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
-      expect(callArgs.body.agent).toBe("Atlas (Plan Executor)")
+      expect(callArgs.body.agent).toBe(getAgentDisplayName("atlas"))
       expect(callArgs.body.agent).not.toBe("atlas")
     })
 

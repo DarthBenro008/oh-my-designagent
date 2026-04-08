@@ -96,13 +96,10 @@ export function normalizeAgentForPrompt(agentName: string | undefined): string |
     return undefined
   }
 
-  const lower = trimmed.toLowerCase()
-  const reversed = REVERSE_DISPLAY_NAMES[lower]
-  if (reversed !== undefined) {
-    return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
-  }
-  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
-    return AGENT_DISPLAY_NAMES[lower]
+  const configKey = getAgentConfigKey(trimmed)
+  const canonicalDisplayName = AGENT_DISPLAY_NAMES[configKey]
+  if (canonicalDisplayName !== undefined) {
+    return canonicalDisplayName
   }
 
   return trimmed

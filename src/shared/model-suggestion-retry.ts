@@ -1,4 +1,4 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "./logger"
 import {
   createPromptTimeoutContext,
@@ -6,7 +6,7 @@ import {
   type PromptRetryOptions,
 } from "./prompt-timeout-context"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 
 export interface ModelSuggestionInfo {
   providerID: string

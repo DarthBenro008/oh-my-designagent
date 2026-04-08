@@ -1,11 +1,11 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { extractUnavailableToolName } from "./detect-error-type"
 import { readParts } from "./storage"
 import type { MessageData } from "./types"
 import { normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 
 interface ToolResultPart {
   type: "tool_result"

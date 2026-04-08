@@ -1,32 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
-
-mock.module("picocolors", () => ({
-  default: {
-    red: (value: string) => value,
-    yellow: (value: string) => value,
-    green: (value: string) => value,
-  },
-}))
-
-mock.module("../../shared", () => ({
-  normalizeSDKResponse: (response: { data?: unknown }, fallback: unknown) =>
-    response?.data ?? fallback,
-}))
-
-mock.module("./continuation-state", () => ({
-  getContinuationState: () => ({
-    hasActiveBoulder: false,
-    hasActiveRalphLoop: false,
-    hasHookMarker: false,
-    hasTodoHookMarker: false,
-    hasActiveHookMarker: false,
-    activeHookMarkerReason: null,
-  }),
-}))
-
-const { createEventState } = await import("./events")
-const { pollForCompletion } = await import("./poll-for-completion")
+import { createEventState } from "./events"
+import { pollForCompletion } from "./poll-for-completion"
 
 const createMockContext = (overrides: {
   todo?: Todo[]

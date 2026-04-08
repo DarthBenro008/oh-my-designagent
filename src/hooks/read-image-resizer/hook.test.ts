@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { ImageDimensions, ResizeResult } from "./types"
@@ -51,6 +51,10 @@ function createInput(tool: string): { tool: string; sessionID: string; callID: s
 }
 
 describe("createReadImageResizerHook", () => {
+  afterAll(() => {
+    mock.restore()
+  })
+
   beforeEach(() => {
     mockParseImageDimensions.mockReset()
     mockCalculateTargetDimensions.mockReset()

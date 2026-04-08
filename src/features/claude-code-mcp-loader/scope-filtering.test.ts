@@ -5,6 +5,7 @@ import { join } from "path"
 
 const TEST_DIR = join(tmpdir(), `mcp-scope-filtering-test-${Date.now()}`)
 const TEST_HOME = join(TEST_DIR, "home")
+const originalSharedModule = await import("../../shared/index.ts?restore")
 
 describe("loadMcpConfigs", () => {
   beforeEach(() => {
@@ -15,6 +16,7 @@ describe("loadMcpConfigs", () => {
       tmpdir,
     }))
     mock.module("../../shared", () => ({
+      ...originalSharedModule,
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
     mock.module("../../shared/logger", () => ({

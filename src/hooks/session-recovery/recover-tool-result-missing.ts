@@ -1,10 +1,10 @@
-import type { createOpencodeClient } from "@opencode-ai/sdk"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { MessageData } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
 
-type Client = ReturnType<typeof createOpencodeClient>
+type Client = PluginInput["client"]
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>

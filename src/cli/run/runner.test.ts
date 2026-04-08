@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
 
 const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig => ({
@@ -22,7 +23,7 @@ describe("resolveRunAgent", () => {
     )
 
     // then
-    expect(agent).toBe("Hephaestus (Deep Agent)")
+    expect(agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   it("uses env agent over config", () => {
@@ -34,7 +35,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, env)
 
     // then
-    expect(agent).toBe("Atlas (Plan Executor)")
+    expect(agent).toBe(getAgentDisplayName("atlas"))
   })
 
   it("uses config agent over default", () => {
@@ -56,7 +57,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("Sisyphus (Ultraworker)")
+    expect(agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
   it("skips disabled sisyphus for next available core agent", () => {
@@ -67,7 +68,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("Hephaestus (Deep Agent)")
+    expect(agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   it("maps display-name style default_run_agent values to canonical display names", () => {
@@ -78,7 +79,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("Sisyphus (Ultraworker)")
+    expect(agent).toBe(getAgentDisplayName("sisyphus"))
   })
 })
 

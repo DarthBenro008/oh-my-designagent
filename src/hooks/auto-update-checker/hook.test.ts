@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+
+const originalCheckerModule = await import("./checker.ts?restore")
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
@@ -37,6 +39,7 @@ mock.module("./hook/background-update-check", () => ({
 }))
 
 mock.module("./checker", () => ({
+  ...originalCheckerModule,
   getCachedVersion: mockGetCachedVersion,
   getLocalDevVersion: mockGetLocalDevVersion,
 }))
@@ -96,6 +99,10 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.OPENCODE_CLI_RUN_MODE
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 describe("createAutoUpdateCheckerHook", () => {

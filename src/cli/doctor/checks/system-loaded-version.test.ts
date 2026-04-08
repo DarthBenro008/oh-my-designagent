@@ -6,10 +6,9 @@ import { dirname, join } from "node:path"
 import { PACKAGE_NAME } from "../constants"
 import { resolveSymlink } from "../../../shared/file-utils"
 
-const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
-
-const { getLoadedPluginVersion, getSuggestedInstallTag }: typeof import("./system-loaded-version") =
-  await import(systemLoadedVersionModulePath)
+async function importFreshSystemLoadedVersion(): Promise<typeof import("./system-loaded-version")> {
+  return import(`./system-loaded-version?test=${Date.now()}-${Math.random()}`)
+}
 
 const originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME
@@ -46,7 +45,7 @@ afterEach(() => {
 
 describe("system loaded version", () => {
   describe("getLoadedPluginVersion", () => {
-    it("prefers the config directory when both installs exist", () => {
+    it("prefers the config directory when both installs exist", async () => {
       //#given
       const configDir = createTemporaryDirectory("omo-config-")
       const cacheHome = createTemporaryDirectory("omo-cache-")
@@ -69,6 +68,7 @@ describe("system loaded version", () => {
       })
 
       //#when
+      const { getLoadedPluginVersion } = await importFreshSystemLoadedVersion()
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
@@ -79,7 +79,7 @@ describe("system loaded version", () => {
       expect(loadedVersion.loadedVersion).toBe("1.2.3")
     })
 
-    it("falls back to the cache directory for legacy installs", () => {
+    it("falls back to the cache directory for legacy installs", async () => {
       //#given
       const configDir = createTemporaryDirectory("omo-config-")
       const cacheHome = createTemporaryDirectory("omo-cache-")
@@ -96,6 +96,7 @@ describe("system loaded version", () => {
       })
 
       //#when
+      const { getLoadedPluginVersion } = await importFreshSystemLoadedVersion()
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
@@ -106,7 +107,7 @@ describe("system loaded version", () => {
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
     })
 
-    it("resolves symlinked config directories before selecting install path", () => {
+    it("resolves symlinked config directories before selecting install path", async () => {
       //#given
       const realConfigDir = createTemporaryDirectory("omo-real-config-")
       const symlinkBaseDir = createTemporaryDirectory("omo-symlink-base-")
@@ -123,6 +124,7 @@ describe("system loaded version", () => {
       })
 
       //#when
+      const { getLoadedPluginVersion } = await importFreshSystemLoadedVersion()
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
@@ -133,11 +135,12 @@ describe("system loaded version", () => {
   })
 
   describe("getSuggestedInstallTag", () => {
-    it("returns prerelease channel when current version is prerelease", () => {
+    it("returns prerelease channel when current version is prerelease", async () => {
       //#given
       const currentVersion = "3.2.0-beta.4"
 
       //#when
+      const { getSuggestedInstallTag } = await importFreshSystemLoadedVersion()
       const installTag = getSuggestedInstallTag(currentVersion)
 
       //#then

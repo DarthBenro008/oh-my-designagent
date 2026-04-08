@@ -1,5 +1,8 @@
 declare const require: (name: string) => any
-const { beforeEach, describe, expect, mock, test } = require("bun:test")
+const { beforeEach, afterEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import * as providerModelIdTransform from "../../shared/provider-model-id-transform"
+import * as modelErrorClassifier from "../../shared/model-error-classifier"
 
 const readConnectedProvidersCacheMock = mock(() => null)
 const readProviderModelsCacheMock = mock(() => null)
@@ -40,28 +43,27 @@ const transformModelForProviderMock = mock((provider: string, model: string) => 
   return model
 })
 
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: readConnectedProvidersCacheMock,
-  readProviderModelsCache: readProviderModelsCacheMock,
-}))
+let clearPendingModelFallback: typeof import("./hook").clearPendingModelFallback
+let createModelFallbackHook: typeof import("./hook").createModelFallbackHook
+let setSessionFallbackChain: typeof import("./hook").setSessionFallbackChain
+let setPendingModelFallback: typeof import("./hook").setPendingModelFallback
 
-mock.module("../../shared/provider-model-id-transform", () => ({
-  transformModelForProvider: transformModelForProviderMock,
-}))
-
-mock.module("../../shared/model-error-classifier", () => ({
-  selectFallbackProvider: selectFallbackProviderMock,
-}))
-
-import {
-  clearPendingModelFallback,
-  createModelFallbackHook,
-  setSessionFallbackChain,
-  setPendingModelFallback,
-} from "./hook"
+async function importFreshModelFallbackHook(): Promise<typeof import("./hook")> {
+  return import(`./hook?test=${Date.now()}-${Math.random()}`)
+}
 
 describe("model fallback hook", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    ;({
+      clearPendingModelFallback,
+      createModelFallbackHook,
+      setSessionFallbackChain,
+      setPendingModelFallback,
+    } = await importFreshModelFallbackHook())
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(providerModelIdTransform, "transformModelForProvider").mockImplementation(transformModelForProviderMock)
+    spyOn(modelErrorClassifier, "selectFallbackProvider").mockImplementation(selectFallbackProviderMock)
     readConnectedProvidersCacheMock.mockReturnValue(null)
     readProviderModelsCacheMock.mockReturnValue(null)
     readConnectedProvidersCacheMock.mockClear()
@@ -71,6 +73,10 @@ describe("model fallback hook", () => {
     clearPendingModelFallback("ses_model_fallback_main")
     clearPendingModelFallback("ses_model_fallback_ghcp")
     clearPendingModelFallback("ses_model_fallback_google")
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {

@@ -54,7 +54,7 @@ export function createCanvasExecutorAgentWithOverrides(args: {
       ...(override?.permission ?? {}),
       task: "deny",
       call_omo_agent: "deny",
-    },
+    } as AgentConfig["permission"],
   };
 
   if (override?.top_p !== undefined) {

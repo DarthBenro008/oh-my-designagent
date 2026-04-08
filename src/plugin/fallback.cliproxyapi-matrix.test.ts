@@ -1,22 +1,20 @@
 declare const require: (name: string) => any
-const { afterEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
 
 const PROVIDER_ID = "cliproxyapi"
 
-mock.module("../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => [PROVIDER_ID],
-  readProviderModelsCache: () => ({
-    connected: [PROVIDER_ID],
-  }),
-}))
-
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
-import { createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { createRuntimeFallbackHook } from "../hooks/runtime-fallback"
 import { _resetForTesting } from "../features/claude-code-session-state"
-import { _resetForTesting as _resetModelFallbackForTesting } from "../hooks/model-fallback/hook"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
+let createModelFallbackHook: typeof import("../hooks/model-fallback/hook").createModelFallbackHook
+let resetModelFallbackForTesting: typeof import("../hooks/model-fallback/hook")._resetForTesting
+
+async function importFreshModelFallbackHook(): Promise<typeof import("../hooks/model-fallback/hook")> {
+  return import(`../hooks/model-fallback/hook?test=${Date.now()}-${Math.random()}`)
+}
 
 const PRIMARY_MODEL = {
   providerID: PROVIDER_ID,
@@ -311,9 +309,21 @@ async function triggerAssistantMessageError(
 }
 
 afterEach(() => {
+  mock.restore()
   _resetForTesting()
-  _resetModelFallbackForTesting()
+  resetModelFallbackForTesting()
   SessionCategoryRegistry.clear()
+})
+
+beforeEach(async () => {
+  ;({
+    createModelFallbackHook,
+    _resetForTesting: resetModelFallbackForTesting,
+  } = await importFreshModelFallbackHook())
+  spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => [PROVIDER_ID])
+  spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(() => ({
+    connected: [PROVIDER_ID],
+  }))
 })
 
 describe("CLIProxyAPI-only fallback matrix", () => {
