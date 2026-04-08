@@ -7,7 +7,7 @@ export function createDesignPipelineSkill(): BuiltinSkill {
       "Structured 4-phase workflow for classifying, planning, executing, and verifying Figma comment resolution",
     template: `# Design Pipeline
 
-Use this workflow to resolve Figma comments with a strict 4-phase pipeline. Be decisive, structured, and scope-safe.
+Use this workflow to resolve Figma comments with a strict routed pipeline. Be decisive, structured, and scope-safe.
 
 ## Task-Type Routing Table
 
@@ -30,15 +30,28 @@ Request types are exactly:
 - new_component
 - design_improvement
 
+Edit intents are exactly:
+- full_redesign
+- text_only
+- frame_props_only
+- create_variants
+
 ## PHASE 1 - CLASSIFY
 
-Read the comment message and the pre-gathered context from the initial prompt.
+Read the WHOLE comment thread plus the pre-gathered context from the initial prompt. Do not classify from the triggering message alone.
 
 Determine:
+- Edit Intent: one of the 4 edit intents above
 - Request Type: one of the 8 request types above
 - Difficulty: easy | medium | hard
 - Scope Mode: node_only | subtree
 - Target Node: pinned nodeId when available, otherwise none
+
+Intent routing rules:
+- text_only: the user only wants copy/text changes. You MUST inspect the full target frame and its children before editing. Only existing text nodes may be changed.
+- frame_props_only: the user wants property-only edits on the target frame/component subtree. You may change layout, fill, stroke, radius, spacing, size, position, visibility, opacity, and similar properties, but NOT text content or structure.
+- create_variants: the user wants options/variants. You MUST create sibling clone frames/components first and keep the original target untouched after classification.
+- full_redesign: the user wants a broader structural or design change inside the target subtree. In-place subtree mutation is allowed.
 
 Confidence scoring rubric:
 - Pinned node present: +30 points
@@ -58,8 +71,9 @@ Routing thresholds:
 Output exactly this block:
 
 ## Classification
-- Request Type: [type]
-- Difficulty: [easy/medium/hard]
+- Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
+- Request Type: [copy_change | token_bind | color_update | spacing_fix | typography_update | layout_change | new_component | design_improvement]
+- Difficulty: [easy | medium | hard]
 - Confidence: [0-100]
 - Routing: [proceed | retry_with_variants | clarify]
 - Scope Mode: [node_only | subtree]
@@ -67,12 +81,32 @@ Output exactly this block:
 
 ## PHASE 2 - PLAN
 
+Planning starts with context discipline:
+- Read the full thread, not just the tagged comment
+- Derive thread root ID: parent_id if present, otherwise the triggering comment ID
+- If a target node is available, gather Figma context in ONE compound bash call, not multiple agent turns
+
+Recommended compound context call:
+\`\`\`bash
+figma-daemon status && echo "---SEPARATOR---" && \
+figma-daemon node tree <nodeId> --depth 3 && echo "---SEPARATOR---" && \
+figma-daemon export jsx <nodeId> --pretty && echo "---SEPARATOR---" && \
+figma-daemon node bindings <nodeId> && echo "---SEPARATOR---" && \
+figma-daemon export node <nodeId> --output /tmp/before.png
+\`\`\`
+
 Planning rules:
 - Easy + proceed: plan a single direct patch with no variants
 - Medium + proceed: plan 2 variants
 - Hard + proceed: plan 3 variants
 - retry_with_variants: proceed with variants regardless of difficulty
-- clarify: reply to the comment asking for clarification, then STOP and do not mutate canvas
+- clarify: reply on the thread with 1-3 precise clarification questions, then STOP. Do not mutate canvas and do not resolve.
+
+Intent-specific planning rules:
+- text_only: gather the full frame subtree context before editing so text changes stay semantically consistent with surrounding labels and hierarchy.
+- frame_props_only: gather the frame subtree and plan property setters only. No render/import/create/clone/delete steps.
+- create_variants: plan sibling clone creation first, then plan edits only against the new clone IDs. Never plan an in-place edit to the original target.
+- full_redesign: plan the smallest structural change that resolves the comment while staying inside the target subtree.
 
 Context gathering strategy by task type:
 - Patch tasks (copy_change, token_bind, color_update, spacing_fix, typography_update): run LIGHTWEIGHT context using status, node tree, export jsx, and node bindings
@@ -87,7 +121,16 @@ Before execution, write a short plan that states:
 
 ## PHASE 3 - EXECUTE
 
-Scope lock: ONLY modify the target node and its descendants. Never touch sibling or parent nodes.
+Scope lock:
+- ONLY modify the target node and its descendants
+- Exception: if Edit Intent = create_variants, create sibling clones from the target first, then mutate ONLY those approved clone IDs
+- Never touch unrelated parents or siblings
+
+Intent gate:
+- text_only: ONLY edit existing text nodes. Allowed commands are limited to text setters and text styling on those nodes.
+- frame_props_only: ONLY edit frame subtree properties. Never change text content and never perform structural mutations.
+- create_variants: clone the original target into new sibling frames/components, rename the clones clearly, position them beside the source, and mutate ONLY those clones afterward.
+- full_redesign: broader subtree edits are allowed, but still stay inside the target subtree and verify the result.
 
 Execution rules by task type:
 - copy_change: use \`figma-daemon set text <nodeId> "new text"\` ONLY
@@ -98,6 +141,12 @@ Execution rules by task type:
 - layout_change: use figma-daemon set layout or render with JSX for structural changes
 - new_component: first run \`figma-daemon export jsx <nodeId> --pretty\`, understand the current structure, then render the improved version with \`figma-daemon render\`
 - design_improvement: export, understand, plan the improvement, then render the new version
+
+Variant rules:
+1. If Edit Intent = \`create_variants\`, do NOT create a Figma component set unless the user explicitly asked for one.
+2. Clone the source frame/component into sibling variants first.
+3. Keep the original source untouched after cloning.
+4. Only rename/move/resize/set properties on the approved clone IDs.
 
 JSX rendering rules for new_component and layout_change:
 1. ALWAYS export existing node first with \`figma-daemon export jsx <nodeId> --pretty\`
@@ -126,12 +175,14 @@ Resolution rules:
 
 Threading rules:
 - ALWAYS reply BEFORE resolving
-- Reply with \`--reply <threadId>\`, never \`--reply <commentId>\`
+- Use the thread root ID: parent_id if present, otherwise the triggering comment ID
+- Reply with \`--reply <threadRootId>\`, never \`--reply <commentId>\`
+- If Routing = clarify, reply with the question(s) and STOP. Do not resolve.
 - NEVER resolve without a prior reply in the same thread
 
 Use these commands in order when verification succeeds:
-- \`figma-daemon comment add "<summary of what changed and why>" --reply <threadId>\`
-- \`figma-daemon comment resolve <threadId>\`
+- \`figma-daemon comment add "<summary of what changed and why>" --reply <threadRootId>\`
+- \`figma-daemon comment resolve <threadRootId>\`
 
 Stay inside the pipeline: classify first, plan second, execute third, verify last.`,
   };

@@ -8,3 +8,8 @@ export {
   clearMutationFlag,
   hasPendingMutation,
 } from "./post-render-qa-hook";
+export {
+  clearDesignIntentState,
+  recordApprovedNodeIds,
+  resolveDesignIntentState,
+} from "./design-intent-state";

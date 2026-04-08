@@ -43,16 +43,14 @@ export function buildClassificationBlock(
   classification: CommentClassification,
 ): string {
   const lines = [
+    `- Edit Intent: ${classification.editIntent}`,
     `- Request Type: ${classification.requestType}`,
     `- Difficulty: ${classification.difficulty}`,
-    `- Confidence: ${classification.confidence}/100`,
+    `- Confidence: ${classification.confidence}`,
     `- Routing: ${classification.routing}`,
     `- Scope Mode: ${classification.scopeMode}`,
+    `- Target Node: ${classification.targetNodeId ?? "none"}`,
   ];
-
-  if (classification.targetNodeId) {
-    lines.push(`- Target Node: ${classification.targetNodeId}`);
-  }
 
   return formatSection("Classification", lines);
 }

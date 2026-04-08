@@ -1,127 +1,223 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import {
-  createScopeLockHook,
-  setScopeTarget,
   clearScopeTarget,
+  createScopeLockHook,
 } from "./scope-lock-hook";
+import {
+  clearDesignIntentState,
+  recordApprovedNodeIds,
+} from "./design-intent-state";
 
-type TestOutput = { args: { command: string }; message: string | undefined };
+const SESSION_ID = "test-session";
+
+function createDesignCtx(texts: string[]) {
+  return {
+    client: {
+      session: {
+        messages: async () => ({
+          data: texts.map((text) => ({
+            info: { role: "assistant" },
+            parts: [{ type: "text", text }],
+          })),
+        }),
+      },
+    },
+  } as any;
+}
+
+function buildClassificationBlock(args: {
+  editIntent?: string;
+  requestType?: string;
+  targetNode?: string;
+}): string {
+  const lines = [
+    "Resolve this Figma comment.",
+    "## Classification",
+  ];
+
+  if (args.editIntent) {
+    lines.push(`- Edit Intent: ${args.editIntent}`);
+  }
+  if (args.requestType) {
+    lines.push(`- Request Type: ${args.requestType}`);
+  }
+  lines.push("- Difficulty: easy");
+  lines.push("- Confidence: 90");
+  lines.push("- Routing: proceed");
+  lines.push("- Scope Mode: subtree");
+  if (args.targetNode) {
+    lines.push(`- Target Node: ${args.targetNode}`);
+  }
+
+  return lines.join("\n");
+}
 
 describe("createScopeLockHook", () => {
   beforeEach(() => {
-    clearScopeTarget("test-session");
+    clearScopeTarget(SESSION_ID);
+    clearDesignIntentState(SESSION_ID);
   });
 
-  describe("#given non-bash tool", () => {
-    test("#when tool is not bash #then no warning injected", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output = {
-        args: { command: 'figma-daemon set fill 5:99 "#FF0000"' },
-        message: undefined,
-      };
-      await hook["tool.execute.before"](
-        { tool: "read", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeUndefined();
-    });
+  test("ignores non-bash tools", async () => {
+    const hook = createScopeLockHook(createDesignCtx([]));
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "read", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 
-  describe("#given bash tool with non-figma command", () => {
-    test("#when command does not include figma-daemon mutation #then no warning injected", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output = { args: { command: "ls -la" }, message: undefined };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeUndefined();
-    });
+  test("requires an Edit Intent classification before design mutations", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        "Resolve this Figma comment.\n## Target\n- Node: `1:23`",
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
+      ),
+    ).rejects.toThrow("Edit Intent");
   });
 
-  describe("#given bash tool with figma-daemon read command", () => {
-    test("#when command is figma-daemon node tree (not a mutation) #then no warning injected", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output = {
-        args: { command: "figma-daemon node tree 1:23" },
-        message: undefined,
-      };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeUndefined();
-    });
+  test("allows text-only mutations on existing text nodes", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "text_only",
+          requestType: "copy_change",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set text 1:23 "Updated copy"' } } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 
-  describe("#given scope target set and mutation command for different node", () => {
-    test("#when figma-daemon set targets different node #then warning injected", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output: TestOutput = {
-        args: { command: 'figma-daemon set fill 5:99 "#FF0000"' },
-        message: undefined,
-      };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeDefined();
-      expect(output.message).toContain("SCOPE-LOCK");
-      expect(output.message).toContain("5:99");
-      expect(output.message).toContain("1:23");
-    });
+  test("blocks frame mutations for text-only intent", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "text_only",
+          requestType: "copy_change",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
+      ),
+    ).rejects.toThrow("text_only intent");
   });
 
-  describe("#given scope target set and mutation command for same node", () => {
-    test("#when figma-daemon set targets the scope target node #then no warning injected", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output = {
-        args: { command: 'figma-daemon set fill 1:23 "#FF0000"' },
-        message: undefined,
-      };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeUndefined();
-    });
+  test("allows non-structural property edits for frame-props-only intent", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "frame_props_only",
+          requestType: "color_update",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set fill 1:23 "$color.primary"' } } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 
-  describe("#given no scope target set", () => {
-    test("#when mutation command runs without scope target #then no warning injected", async () => {
-      const hook = createScopeLockHook({} as any);
-      const output = {
-        args: { command: 'figma-daemon set fill 5:99 "#FF0000"' },
-        message: undefined,
-      };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toBeUndefined();
-    });
+  test("blocks text edits for frame-props-only intent", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "frame_props_only",
+          requestType: "spacing_fix",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set text 1:23 "Nope"' } } as any,
+      ),
+    ).rejects.toThrow("frame_props_only intent");
   });
 
-  describe("#given output.message already has content", () => {
-    test("#when warning is injected #then it is appended not replaced", async () => {
-      setScopeTarget("test-session", "1:23");
-      const hook = createScopeLockHook({} as any);
-      const output = {
-        args: { command: 'figma-daemon set fill 5:99 "#FF0000"' },
-        message: "existing message",
-      };
-      await hook["tool.execute.before"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        output as any,
-      );
-      expect(output.message).toContain("existing message");
-      expect(output.message).toContain("SCOPE-LOCK");
-      expect(output.message?.startsWith("existing message")).toBe(true);
-    });
+  test("allows cloning the original target for create-variants intent", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "create_variants",
+          requestType: "design_improvement",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon node clone 1:23 --x 300 --y 0' } } as any,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  test("blocks edits to the original target after variant clones are approved", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "create_variants",
+          requestType: "design_improvement",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    recordApprovedNodeIds(SESSION_ID, ["2:22"], { variantClones: true });
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon node rename 1:23 "Original edited"' } } as any,
+      ),
+    ).rejects.toThrow("Only approved variant clones may be mutated");
+  });
+
+  test("allows edits on approved clone ids for create-variants intent", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "create_variants",
+          requestType: "design_improvement",
+          targetNode: "1:23",
+        }),
+      ]),
+    );
+
+    recordApprovedNodeIds(SESSION_ID, ["2:22"], { variantClones: true });
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon node rename 2:22 "Variant A"' } } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 });

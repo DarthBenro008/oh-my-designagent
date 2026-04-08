@@ -14,7 +14,14 @@ export type ConfidenceRouting = "proceed" | "retry_with_variants" | "clarify";
 
 export type PipelinePhase = "classify" | "plan" | "execute" | "verify";
 
+export type CommentEditIntent =
+  | "full_redesign"
+  | "text_only"
+  | "frame_props_only"
+  | "create_variants";
+
 export interface CommentClassification {
+  editIntent: CommentEditIntent;
   requestType: CommentRequestType;
   difficulty: CommentDifficulty;
   confidence: number;
@@ -80,6 +87,26 @@ export const TASK_TYPE_PROFILES: Record<CommentRequestType, TaskTypeProfile> = {
     lensProfile: "full",
   },
 };
+
+export const REQUEST_TYPE_EDIT_INTENTS: Record<
+  CommentRequestType,
+  CommentEditIntent
+> = {
+  copy_change: "text_only",
+  token_bind: "frame_props_only",
+  color_update: "frame_props_only",
+  spacing_fix: "frame_props_only",
+  typography_update: "text_only",
+  layout_change: "full_redesign",
+  new_component: "full_redesign",
+  design_improvement: "full_redesign",
+};
+
+export function getDefaultEditIntent(
+  requestType: CommentRequestType,
+): CommentEditIntent {
+  return REQUEST_TYPE_EDIT_INTENTS[requestType];
+}
 
 export function getConfidenceRouting(
   score: number,

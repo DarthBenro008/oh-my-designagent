@@ -1,111 +1,234 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import {
+  clearMutationFlag,
   createPostRenderQaHook,
   hasPendingMutation,
-  clearMutationFlag,
 } from "./post-render-qa-hook";
+import { clearDesignIntentState } from "./design-intent-state";
+
+const SESSION_ID = "test-session";
+
+function createDesignCtx(threadId?: string) {
+  const text = threadId
+    ? `Resolve this Figma comment.\n## Comment Data\n- Thread ID: ${threadId}`
+    : "Resolve this Figma comment.";
+
+  return {
+    client: {
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text }],
+            },
+          ],
+        }),
+      },
+    },
+  } as any;
+}
+
+async function runBashCommand(
+  hook: ReturnType<typeof createPostRenderQaHook>,
+  args: {
+    callID: string;
+    command: string;
+    output?: string;
+  },
+): Promise<void> {
+  await hook["tool.execute.before"](
+    { tool: "bash", sessionID: SESSION_ID, callID: args.callID },
+    { args: { command: args.command } } as any,
+  );
+
+  await hook["tool.execute.after"](
+    { tool: "bash", sessionID: SESSION_ID, callID: args.callID },
+    {
+      title: "ok",
+      output: args.output ?? "",
+      metadata: {},
+    },
+  );
+}
 
 describe("createPostRenderQaHook", () => {
   beforeEach(() => {
-    clearMutationFlag("test-session");
+    clearMutationFlag(SESSION_ID);
+    clearDesignIntentState(SESSION_ID);
   });
 
-  describe("#given a non-bash tool execution", () => {
-    test("#when tool.execute.after fires for a non-bash tool #then mutation flag is not set", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "read", sessionID: "test-session", callID: "c1" },
-        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(false);
+  test("ignores non-bash tool executions", async () => {
+    const hook = createPostRenderQaHook({} as any);
+
+    await expect(
+      hook["tool.execute.after"](
+        { tool: "read", sessionID: SESSION_ID, callID: "c1" },
+        { title: "ok", output: "", metadata: {} },
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(hasPendingMutation(SESSION_ID)).toBe(false);
+  });
+
+  test("tracks pending QA after a canvas mutation", async () => {
+    const hook = createPostRenderQaHook({} as any);
+
+    await runBashCommand(hook, {
+      callID: "c1",
+      command: 'figma-daemon set fill 1:23 "#FF0000"',
+      output: '{"id":"1:23"}',
     });
+
+    expect(hasPendingMutation(SESSION_ID)).toBe(true);
   });
 
-  describe("#given bash tool with figma-daemon set command", () => {
-    test("#when figma-daemon set fill runs #then hasPendingMutation returns true", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(true);
+  test("clears pending QA only after export, lint, and bindings verification", async () => {
+    const hook = createPostRenderQaHook({} as any);
+
+    await runBashCommand(hook, {
+      callID: "c1",
+      command: 'figma-daemon set fill 1:23 "#FF0000"',
+      output: '{"id":"1:23"}',
     });
-  });
+    expect(hasPendingMutation(SESSION_ID)).toBe(true);
 
-  describe("#given bash tool with figma-daemon render command", () => {
-    test("#when figma-daemon render runs #then hasPendingMutation returns true", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: "figma-daemon render --stdin" } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(true);
+    await runBashCommand(hook, {
+      callID: "c2",
+      command: "figma-daemon export node 1:23 --output /tmp/after.png",
     });
-  });
+    expect(hasPendingMutation(SESSION_ID)).toBe(true);
 
-  describe("#given bash tool with read-only figma-daemon command", () => {
-    test("#when figma-daemon node tree runs #then hasPendingMutation returns false", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: "figma-daemon node tree 1:23" } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(false);
+    await runBashCommand(hook, {
+      callID: "c3",
+      command: "figma-daemon lint --root 1:23 -v",
     });
+    expect(hasPendingMutation(SESSION_ID)).toBe(true);
+
+    await runBashCommand(hook, {
+      callID: "c4",
+      command: "figma-daemon node bindings 1:23",
+    });
+    expect(hasPendingMutation(SESSION_ID)).toBe(false);
   });
 
-  describe("#given mutation followed by export verification", () => {
-    test("#when figma-daemon export node runs after mutation #then hasPendingMutation returns false", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(true);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c2" },
+  test("blocks comment replies before verification is complete", async () => {
+    const hook = createPostRenderQaHook({} as any);
+
+    await runBashCommand(hook, {
+      callID: "c1",
+      command: 'figma-daemon set fill 1:23 "#FF0000"',
+      output: '{"id":"1:23"}',
+    });
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c2" },
         {
           args: {
-            command: "figma-daemon export node 1:23 --output /tmp/after.png",
+            command: 'figma-daemon comment add "done" --reply 123',
           },
         } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(false);
-    });
+      ),
+    ).rejects.toThrow("POST-RENDER QA");
   });
 
-  describe("#given session.idle with pending mutation", () => {
-    test("#when session goes idle #then QA reminder is injected in output.message", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
-      );
-      const output: { message?: string } = {};
-      await hook["session.idle"]({ sessionID: "test-session" }, output);
-      expect(output.message).toContain("POST-RENDER QA");
+  test("allows comment replies after verification is complete", async () => {
+    const hook = createPostRenderQaHook({} as any);
+
+    await runBashCommand(hook, {
+      callID: "c1",
+      command: 'figma-daemon set fill 1:23 "#FF0000"',
+      output: '{"id":"1:23"}',
     });
+    await runBashCommand(hook, {
+      callID: "c2",
+      command: "figma-daemon export node 1:23 --output /tmp/after.png",
+    });
+    await runBashCommand(hook, {
+      callID: "c3",
+      command: "figma-daemon lint --root 1:23 -v",
+    });
+    await runBashCommand(hook, {
+      callID: "c4",
+      command: "figma-daemon node bindings 1:23",
+    });
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c5" },
+        {
+          args: {
+            command: 'figma-daemon comment add "done" --reply 123',
+          },
+        } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 
-  describe("#given session.idle without pending mutation", () => {
-    test("#when session goes idle with no pending mutation #then output.message is unchanged", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      const output: { message?: string } = { message: "existing" };
-      await hook["session.idle"]({ sessionID: "test-session" }, output);
-      expect(output.message).toBe("existing");
-    });
+  test("blocks detached comments when a thread id is known", async () => {
+    const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        {
+          args: {
+            command: 'figma-daemon comment add "done"',
+          },
+        } as any,
+      ),
+    ).rejects.toThrow("THREAD-REPLY");
   });
 
-  describe("#given clearMutationFlag called explicitly", () => {
-    test("#when clearMutationFlag is called after mutation #then hasPendingMutation returns false", async () => {
-      const hook = createPostRenderQaHook({} as any);
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID: "test-session", callID: "c1" },
-        { args: { command: "figma-daemon create frame 1:1" } } as any,
-      );
-      expect(hasPendingMutation("test-session")).toBe(true);
-      clearMutationFlag("test-session");
-      expect(hasPendingMutation("test-session")).toBe(false);
+  test("blocks replies to the wrong thread id", async () => {
+    const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        {
+          args: {
+            command: 'figma-daemon comment add "done" --reply wrong-thread',
+          },
+        } as any,
+      ),
+    ).rejects.toThrow("wrong thread");
+  });
+
+  test("blocks resolve until the correct thread reply has been posted", async () => {
+    const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        {
+          args: {
+            command: "figma-daemon comment resolve thread-123",
+          },
+        } as any,
+      ),
+    ).rejects.toThrow("Resolve is blocked");
+  });
+
+  test("allows resolve after a correct reply is posted to the thread", async () => {
+    const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
+
+    await runBashCommand(hook, {
+      callID: "c1",
+      command: 'figma-daemon comment add "done" --reply thread-123',
+      output: '{"id":"reply-1","parent_id":"thread-123"}',
     });
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c2" },
+        {
+          args: {
+            command: "figma-daemon comment resolve thread-123",
+          },
+        } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 });

@@ -130,6 +130,40 @@ function maybeSkillList(figmaUseEnabled?: boolean): string[] | undefined {
   return figmaUseEnabled ? ["figma-daemon"] : undefined;
 }
 
+function buildEditIntentSection(): string {
+  return `## Edit Intent Gate
+
+Every design comment must be classified into BOTH:
+- Edit Intent: full_redesign | text_only | frame_props_only | create_variants
+- Request Type: copy_change | token_bind | color_update | spacing_fix | typography_update | layout_change | new_component | design_improvement
+
+Edit Intent is the primary execution constraint.
+
+Hard rules:
+- text_only: inspect the full target frame subtree before editing; only existing text nodes may be changed.
+- frame_props_only: only mutate frame/component subtree properties such as layout, fill, stroke, spacing, radius, size, position, visibility, opacity, and related properties; never change text content or structure.
+- create_variants: clone the target into sibling frames/components first; never mutate the original source after this intent is chosen; do not convert the work into a component set unless explicitly requested.
+- full_redesign: broader in-place subtree edits are allowed, but stay inside the approved target subtree.`;
+}
+
+function buildThreadingProtocolSection(
+  threadIdPlaceholder = "<threadRootId>",
+): string {
+  return `## Threading Protocol
+
+- Read the whole thread, not just the triggering comment.
+- Thread root ID = parent_id if present, otherwise the triggering comment ID.
+- Reply to the thread root, never the leaf comment ID.
+- If routing = "clarify", reply with 1-3 precise questions and STOP. Do not mutate the canvas and do not resolve.
+- After any mutation, finish verification before replying or resolving.
+
+Use exactly:
+\`\`\`bash
+figma-daemon comment add "<summary of what changed and why>" --reply ${threadIdPlaceholder}
+figma-daemon comment resolve ${threadIdPlaceholder}
+\`\`\``;
+}
+
 export function createSolacyAgent(ctx: DesignAgentContext): AgentConfig {
   const config: AgentConfigWithSkills = {
     mode: PRIMARY_MODE,
@@ -145,12 +179,16 @@ ${buildMemorySection(ctx.memorySummary)}
 
 ${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
+${buildEditIntentSection()}
+
 ${buildAgentRosterSection(ctx.availableAgents)}
 
 ${buildToolingSection(ctx.availableToolNames, ctx.availableCategories)}
 
 Operating rules:
 - Start by identifying the real design intent behind the comment or request.
+- Read the full comment thread before classifying, planning, or replying.
+- Classify editIntent before requestType. The 4-way intent gate controls what mutations are allowed.
 - Load memory and inspect context before deciding whether this is copy, token, spacing, layout, creation, or broader design improvement work.
 - Route comment-resolution work through the comment planner and comment conductor mindset, not generic coding heuristics.
 - Use explore for local design-system and product-context discovery.
@@ -174,20 +212,24 @@ If no nodeId is provided, start with: \`figma-daemon comment list --json\` to ge
 
 ## Pipeline Delegation Workflow
 
-1. Gather context (one compound bash call)
-2. Delegate to Comment Planner — pass comment + pre-gathered context
-3. Read planner output: requestType, confidence, routing, scopeMode
-4. If routing = "clarify": reply to comment asking for clarification, then stop
-5. Delegate to Canvas Executor — include classification block + pre-gathered context + scope lock
-6. Delegate to Vision Reviewer + Design Auditor in parallel (as background tasks)
-7. If both approve: reply to comment + resolve
-8. If rejected: retry executor once with correction notes, then decide
+1. Read the whole comment thread and derive the thread root ID
+2. Gather context (one compound bash call)
+3. Delegate to Comment Planner — pass the full thread + pre-gathered context
+4. Read planner output: editIntent, requestType, confidence, routing, scopeMode
+5. If routing = "clarify": reply in the thread with 1-3 precise questions, then stop without mutating or resolving
+6. Delegate to Canvas Executor — include the classification block + pre-gathered context + scope lock + intent guard
+7. Delegate to Vision Reviewer + Design Auditor in parallel after mutation
+8. If both approve and verification is complete: reply in the thread, then resolve the thread root
+9. If rejected: retry the executor once with correction notes, then decide whether to reply with a partial result
 
 Comment resolution protocol:
 - ALWAYS inspect the target node before making any changes. Use \`figma-daemon node tree <nodeId>\` and \`figma-daemon export jsx <nodeId>\` to understand the current state.
-- ALWAYS reply to the comment with a summary of the work done before resolving it. Use \`figma-daemon comment add "<summary>" --reply <commentId>\` to post the reply.
-- ONLY resolve the comment after replying with relevant work data. Use \`figma-daemon comment resolve <commentId>\` as the final step.
-- Never resolve a comment without first replying to it. The reply should describe what was changed and why.`,
+- If Edit Intent = \`text_only\`, inspect the whole frame subtree and only edit text nodes.
+- If Edit Intent = \`create_variants\`, create sibling clone frames/components first and keep the original source untouched.
+- If Routing = \`clarify\`, reply with the question(s) and stop. Do not resolve.
+- Never resolve a thread without replying first, and never reply or resolve before verification is complete.
+
+${buildThreadingProtocolSection()}`,
     permission: {
       question: "allow",
     },
@@ -212,8 +254,11 @@ ${buildMemorySection(ctx.memorySummary)}
 
 ${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
+${buildEditIntentSection()}
+
 Execution rules:
 - Explore before acting. Read product and design memory that changes the decision.
+- Classify editIntent before mutating. The intent gate decides whether you may edit text, edit properties, clone variants, or redesign in place.
 - Prefer semantic tokens, established spacing rules, and existing component patterns.
 - When live Figma mutation is available, inspect before patching and verify after patching.
 - Use variants for medium or hard design changes when the right solution is ambiguous.
@@ -232,7 +277,7 @@ For new_component and design_improvement tasks:
 1. Export existing first: \`figma-daemon export jsx <nodeId> --pretty\`
 2. Understand the current structure before proposing changes
 3. Use $Variable for all colors -- never hardcode hex
-4. Use defineComponent for reusable elements, defineComponentSet for variant sets
+4. Use defineComponent for reusable elements. For comment-resolution variants, create sibling clone frames/components instead of component sets unless explicitly requested.
 5. Position renders explicitly with --x and --y
 6. After rendering, verify: \`figma-daemon export node <id> --output /tmp/check.png\`
 7. For iteration: use \`figma-daemon set\` or \`figma-daemon diff apply\` -- not full re-renders
@@ -264,6 +309,8 @@ ${buildMemorySection(ctx.memorySummary)}
 
 ${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
+${buildEditIntentSection()}
+
 Your phases:
 1. Ask the planner to classify the comment and identify the exact target/scope.
 2. Decide whether more local memory or research is needed.
@@ -276,7 +323,11 @@ Policy:
 - Medium comment tasks: produce 2 variants before selection.
 - Hard layout or creation work: gather more context, then produce 3 variants.
 - Low confidence or unclear target: do not mutate the canvas.
+- create_variants intent means sibling clones only. The original target stays unchanged after classification.
+- text_only intent means subtree inspection first, then text-node edits only.
+- frame_props_only intent means property-only edits inside the target subtree with no text-content or structural changes.
 - Treat design memory as binding context unless the user explicitly overrides it.
+- Read the whole thread before deciding what the comment actually means.
 
 ## Design Comment Resolution Pipeline
 
@@ -292,19 +343,20 @@ Before delegating, run one compound bash command to gather all needed context:
 Combine with && echo "---SEPARATOR---" && between each command.
 
 **Step 2 — Delegate to Comment Planner (metis)**
-Pass: comment text, nodeId, pre-gathered context (node tree + JSX + bindings).
-The planner returns: requestType, difficulty, confidence (0-100), routing, scopeMode.
+Pass: the full comment thread, nodeId, thread root ID, and pre-gathered context (node tree + JSX + bindings).
+The planner returns: editIntent, requestType, difficulty, confidence (0-100), routing, scopeMode.
 
 **Step 3 — Route based on routing**
 - "proceed": Execute directly (easy) or with variants (medium -> 2 variants, hard -> 3 variants).
 - "retry_with_variants": Always produce variants regardless of difficulty.
-- "clarify": Reply to comment asking for clarification. DO NOT mutate the canvas. Stop.
+- "clarify": Reply in the thread with 1-3 precise questions. DO NOT mutate the canvas. Stop and do not resolve.
 
 **Step 4 — Delegate to Canvas Executor (sisyphus-junior)**
 Include in delegation prompt:
-- Classification block (requestType, difficulty, confidence, routing, scopeMode)
+- Classification block (editIntent, requestType, difficulty, confidence, routing, scopeMode)
 - Pre-gathered context (node tree, JSX, bindings, before screenshot path)
 - Scope lock: "You may ONLY modify node [nodeId] and its descendants."
+- If editIntent = "create_variants": "Clone the target into sibling variants first. Do not mutate the original node after cloning."
 - If variants requested: "Generate [N] variants. Label them Variant A, B, C."
 
 **Step 5 — Parallel Review**
@@ -322,6 +374,7 @@ After executor confirms completion, delegate simultaneously:
 When delegating to the executor, include this structured block:
 \`\`\`
 ## Pipeline Context
+- Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
 - Request Type: [type]
 - Difficulty: [level]
 - Confidence: [0-100]
@@ -337,11 +390,7 @@ When delegating to the executor, include this structured block:
 The target node is pinned. When delegating to Canvas Executor, ALWAYS include:
 "SCOPE LOCK: You may ONLY modify node [nodeId] and its descendants. No parent, sibling, or unrelated nodes."
 
-## Threading Protocol
-
-- Use figma-daemon comment add "<summary>" --reply <threadId> BEFORE resolving
-- Use figma-daemon comment resolve <threadId> ONLY after replying
-- threadId is the comment's parent_id if it's a reply, otherwise the comment's own id`,
+${buildThreadingProtocolSection()}`,
     permission: {
       question: "allow",
       call_omo_agent: "deny",
@@ -377,7 +426,11 @@ ${buildMemorySection(ctx.memorySummary)}
 
 ${buildFigmaUseSection(ctx.figmaUseEnabled, ctx.figmaUseServerName, ctx.figmaUseMode)}
 
+${buildEditIntentSection()}
+
 Responsibilities:
+- Read the whole comment thread, not just the triggering message.
+- Classify the edit intent first: full_redesign, text_only, frame_props_only, or create_variants.
 - Classify the request type: copy_change, token_bind, color_update, spacing_fix, typography_update, layout_change, new_component, design_improvement.
 - Infer what memory is relevant before committing to a resolution path.
 - Distinguish easy direct fixes from tasks that need variants or clarification.
@@ -389,6 +442,7 @@ Output requirements:
 - confidence
 - recommended execution path
 - whether clarification is required
+- clarification questions when routing = clarify
 
 Do not mutate files or the canvas. Planning only.
 
@@ -397,6 +451,7 @@ Do not mutate files or the canvas. Planning only.
 Always output a classification block in this exact format:
 \`\`\`
 ## Classification
+- Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
 - Request Type: [copy_change | token_bind | color_update | spacing_fix | typography_update | layout_change | new_component | design_improvement]
 - Difficulty: [easy | medium | hard]
 - Confidence: [0-100]
@@ -415,6 +470,13 @@ Always output a classification block in this exact format:
 - layout_change: Layout direction, alignment, distribution, or structure needs restructuring
 - new_component: A new UI element or component needs to be created
 - design_improvement: General visual/UX improvement beyond single property changes
+
+## Edit Intent Classification Criteria
+
+- text_only: The request is limited to wording, copy, labels, or text styling on existing text nodes.
+- frame_props_only: The request is limited to non-structural property edits in the target frame/component subtree.
+- create_variants: The request explicitly asks for options, variants, alternatives, or explorations that should leave the source intact.
+- full_redesign: The request needs structural changes, new UI, or broader in-place redesign inside the target subtree.
 
 ## Confidence Scoring Rubric
 
@@ -658,15 +720,25 @@ ${buildFigmaUseSection(args.figmaUseEnabled, args.figmaUseServerName, args.figma
 Execution rules:
 - You do not delegate.
 - Use ${executionSurface} as the primary execution surface when enabled.
+- Do not mutate unless the Pipeline Context already includes the Classification block.
+- If Routing = "clarify", perform no mutation.
 - Inspect before mutating.
 - For easy comment fixes, prefer the smallest direct patch.
 - For layout or creation work, render variants only when the planner or conductor requested them.
 - Preserve semantic tokens and bindings whenever possible.
 - After mutating, gather enough output for review agents to verify the result.
+- Do not reply to or resolve Figma comments yourself.
 
 ## Scope Lock
 
 WARNING SCOPE LOCK: You may ONLY modify the target node specified in the Pipeline Context and its direct descendants. Any figma-daemon command targeting a different node ID is FORBIDDEN. Check the Pipeline Context "Target Node" before every mutation.
+
+## Intent Gate
+
+- text_only: inspect the whole target frame subtree first; only edit existing text nodes.
+- frame_props_only: only mutate non-structural frame/component subtree properties; never change text content or structure.
+- create_variants: clone the target into sibling frames/components first; keep the original untouched after cloning; do not create a component set unless explicitly requested.
+- full_redesign: broader subtree edits are allowed, but stay inside scope.
 
 ## Execution Rules by Task Type
 

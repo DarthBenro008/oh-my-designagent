@@ -37,11 +37,19 @@ describe("createDesignPipelineSkill", () => {
 
     expect(skill.template).toContain("node_only");
     expect(skill.template).toContain("subtree");
+    expect(skill.template).toContain("Edit Intent");
+    expect(skill.template).toContain("text_only");
+    expect(skill.template).toContain("frame_props_only");
+    expect(skill.template).toContain("create_variants");
     expect(skill.template).toContain("72");
     expect(skill.template).toContain("30");
     expect(skill.template).toContain("figma-daemon comment add");
     expect(skill.template).toContain("figma-daemon comment resolve");
+    expect(skill.template).toContain("WHOLE comment thread");
+    expect(skill.template).toContain("--reply <threadRootId>");
+    expect(skill.template).toContain("reply on the thread with 1-3 precise clarification questions");
     expect(skill.template).toMatch(/ONLY modify|scope lock|scope_lock/);
     expect(skill.template).toContain("export jsx");
+    expect(skill.template).toContain("Clone the source frame/component into sibling variants first");
   });
 });

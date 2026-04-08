@@ -259,6 +259,8 @@ export function createEventHandler(args: {
     await runEventHookSafely("compactionContextInjector", hooks.compactionContextInjector?.event, input);
     await runEventHookSafely("compactionTodoPreserver", hooks.compactionTodoPreserver?.event, input);
     await runEventHookSafely("writeExistingFileGuard", hooks.writeExistingFileGuard?.event, input);
+    await runEventHookSafely("scopeLock", hooks.scopeLock?.event, input);
+    await runEventHookSafely("postRenderQa", hooks.postRenderQa?.event, input);
     await runEventHookSafely("atlasHook", hooks.atlasHook?.handler, input);
     await runEventHookSafely("autoSlashCommand", hooks.autoSlashCommand?.event, input);
   };

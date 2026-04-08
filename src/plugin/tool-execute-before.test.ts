@@ -87,6 +87,40 @@ describe("createToolExecuteBeforeHandler", () => {
     expect(called).toBe(false)
   })
 
+  test("runs scope-lock and post-render-qa before hooks for bash tools", async () => {
+    const callOrder: string[] = []
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {
+        scopeLock: {
+          "tool.execute.before": async () => {
+            callOrder.push("scope-lock")
+          },
+        },
+        postRenderQa: {
+          "tool.execute.before": async () => {
+            callOrder.push("post-render-qa")
+          },
+        },
+      },
+    })
+
+    await handler(
+      { tool: "bash", sessionID: "ses_b", callID: "call_b" },
+      { args: { command: "figma-daemon set fill 1:23 '#fff'" } as Record<string, unknown> },
+    )
+
+    expect(callOrder).toEqual(["scope-lock", "post-render-qa"])
+  })
+
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 

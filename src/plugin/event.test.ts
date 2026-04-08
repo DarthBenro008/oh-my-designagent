@@ -12,6 +12,53 @@ afterEach(() => {
 	_resetForTesting()
 })
 
+describe("createEventHandler - design pipeline hook dispatch", () => {
+  it("dispatches session.deleted events to scope-lock and post-render-qa hooks", async () => {
+    const calls: string[] = []
+
+    const eventHandler = createEventHandler({
+      ctx: {} as any,
+      pluginConfig: {} as any,
+      firstMessageVariantGate: {
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {
+        tmuxSessionManager: {
+          onSessionCreated: async () => {},
+          onSessionDeleted: async () => {},
+        },
+        skillMcpManager: {
+          disconnectSession: async () => {},
+        },
+      } as any,
+      hooks: {
+        scopeLock: {
+          event: async () => {
+            calls.push("scope-lock")
+          },
+        },
+        postRenderQa: {
+          event: async () => {
+            calls.push("post-render-qa")
+          },
+        },
+      } as any,
+    })
+
+    await eventHandler({
+      event: {
+        type: "session.deleted",
+        properties: {
+          info: { id: "ses_design_1" },
+        },
+      },
+    } as any)
+
+    expect(calls).toEqual(["scope-lock", "post-render-qa"])
+  })
+})
+
 	describe("createEventHandler - idle deduplication", () => {
 	it("Order A (status→idle): synthetic idle deduped - real idle not dispatched again", async () => {
 		//#given
