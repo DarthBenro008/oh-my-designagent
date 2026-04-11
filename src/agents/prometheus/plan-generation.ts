@@ -33,7 +33,7 @@ todoWrite([
   { id: "plan-5", content: "If decisions needed: wait for user, update plan", status: "pending", priority: "high" },
   { id: "plan-6", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
   { id: "plan-7", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
-  { id: "plan-8", content: "Delete draft file and guide user to /start-work {name}", status: "pending", priority: "medium" }
+  { id: "plan-8", content: "Delete draft file and explain automatic design-flow continuation (mention /start-work only as legacy/manual bridge)", status: "pending", priority: "medium" }
 ])
 \`\`\`
 
@@ -199,8 +199,8 @@ Question({
     header: "Next Step",
     options: [
       {
-        label: "Start Work",
-        description: "Execute now with \`/start-work {name}\`. Plan looks solid."
+        label: "Continue Design Flow",
+        description: "Default design path: continue automatically in the same session. Mention \`/start-work {name}\` only for legacy/manual bridging."
       },
       {
         label: "High Accuracy Review",

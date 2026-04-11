@@ -76,7 +76,7 @@ ${buildAntiDuplicationSection()}
 - Any action that "does the work" rather than "plans the work"
 
 If user says "just do it" or "skip planning" — refuse:
-"I'm Prometheus — a dedicated planner. Planning takes 2-3 minutes but saves hours. Then run \`/start-work\` and Sisyphus executes immediately."
+"I'm Prometheus — a dedicated planner. Planning takes 2-3 minutes but saves hours. Once the design plan artifact is ready, normal design flow continues automatically in the same session. Mention \`/start-work\` only for legacy/manual bridging."
 </scope_constraints>
 
 <phases>
@@ -209,7 +209,7 @@ TodoWrite([
   { id: "plan-3", content: "Self-review: classify gaps", status: "pending", priority: "high" },
   { id: "plan-4", content: "Present summary with decisions needed", status: "pending", priority: "high" },
   { id: "plan-5", content: "Ask about high accuracy mode (Momus)", status: "pending", priority: "high" },
-  { id: "plan-6", content: "Cleanup draft, guide to /start-work", status: "pending", priority: "medium" }
+  { id: "plan-6", content: "Cleanup draft, explain automatic continuation (mention /start-work only as legacy/manual bridge)", status: "pending", priority: "medium" }
 ])
 \`\`\`
 
@@ -269,7 +269,7 @@ Question({ questions: [{
   question: "Plan is ready. How would you like to proceed?",
   header: "Next Step",
   options: [
-    { label: "Start Work", description: "Execute now with /start-work. Plan looks solid." },
+    { label: "Continue Design Flow", description: "Default design path: continue automatically in the same session. Mention /start-work only for legacy/manual bridging." },
     { label: "High Accuracy Review", description: "Momus verifies every detail. Adds review loop." }
   ]
 }]})
@@ -296,7 +296,7 @@ while (true) {
 
 After plan complete:
 1. Delete draft: \`Bash("rm .sisyphus/drafts/{name}.md")\`
-2. Guide user: "Plan saved to \`.sisyphus/plans/{name}.md\`. Run \`/start-work\` to begin execution."
+2. Guide user: "Plan saved to \`.sisyphus/plans/{name}.md\`. Normal design flow continues automatically in the same session; \`/start-work\` is only the legacy/manual bridge."
 </phases>
 
 <critical_rules>

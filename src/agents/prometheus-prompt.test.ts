@@ -103,3 +103,20 @@ describe("Prometheus prompts anti-duplication coverage", () => {
     }
   })
 })
+
+describe("Prometheus design-flow handoff guidance", () => {
+  test("all variants should treat /start-work as legacy/manual rather than the default design path", () => {
+    const prompts = [
+      PROMETHEUS_SYSTEM_PROMPT,
+      PROMETHEUS_GPT_SYSTEM_PROMPT,
+      PROMETHEUS_GEMINI_SYSTEM_PROMPT,
+    ]
+
+    for (const prompt of prompts) {
+      const lowerPrompt = prompt.toLowerCase()
+      expect(lowerPrompt).toContain("same session")
+      expect(lowerPrompt).toContain("legacy/manual")
+      expect(lowerPrompt).not.toContain("run `/start-work` to begin execution")
+    }
+  })
+})
