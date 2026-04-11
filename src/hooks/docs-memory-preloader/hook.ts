@@ -2,7 +2,10 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { DesignMemoryConfig } from "../../config"
 import type { ContextCollector } from "../../features/context-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { loadDesignMemoryPacket } from "../../shared/design-memory"
+import {
+  getDesignMemoryRoleForAgent,
+  loadDesignMemoryPacket,
+} from "../../shared/design-memory"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import {
@@ -109,9 +112,10 @@ export function createDocsMemoryPreloaderHook(
       }
 
       const cleanPrompt = removeSystemReminders(prompt)
+      const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
       if (!shouldPreloadDocsMemory({
         config,
-        agent: input.agent,
+        agent: currentAgent,
         prompt: cleanPrompt,
         sessionID: input.sessionID,
       })) {
@@ -122,6 +126,7 @@ export function createDocsMemoryPreloaderHook(
         directory: ctx.directory,
         config,
         prompt: cleanPrompt,
+        role: getDesignMemoryRoleForAgent(currentAgent),
       })
 
       if (!packet.summary || packet.files.length === 0) {

@@ -101,6 +101,111 @@ describe("loadDesignMemoryPacket", () => {
     ])
   })
 
+  test("shapes planner, executor, and reviewer memory differently", () => {
+    testDir = mkdtempSync(join(tmpdir(), "design-memory-roles-"))
+    mkdirSync(join(testDir, "docs"), { recursive: true })
+    writeFileSync(join(testDir, "docs", "product-overview.md"), "product context ".repeat(30))
+    writeFileSync(join(testDir, "docs", "user-workflows.md"), "user behavior journey ".repeat(30))
+    writeFileSync(join(testDir, "docs", "design-system.md"), "tokens spacing typography ".repeat(30))
+    writeFileSync(join(testDir, "docs", "design-learned.md"), "historical learnings regression ".repeat(30))
+    writeFileSync(join(testDir, "docs", "copy-voice.md"), "voice tone labels CTA ".repeat(30))
+
+    const config = {
+      enabled: true,
+      docs_first: true,
+      docs_root: "docs",
+      docs_globs: ["**/*.md"],
+      prefer_docs_types: [],
+      auto_load_for_comment_resolution: true,
+      max_docs_files: 2,
+      max_chars_per_file: 120,
+      max_total_chars: 320,
+      files: [],
+    }
+
+    const plannerPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Plan a new checkout component",
+      role: "planner",
+      requestType: "new_component",
+      config,
+    })
+    const executorPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Bind tokens and update the component spacing",
+      role: "executor",
+      requestType: "token_bind",
+      config,
+    })
+    const reviewerPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Review the copy and check for regressions",
+      role: "reviewer",
+      requestType: "copy_change",
+      config,
+    })
+
+    expect(plannerPacket.summary).toContain("Planner Focus")
+    expect(plannerPacket.files.map((file) => file.relativePath)).toEqual([
+      "docs/design-system.md",
+      "docs/product-overview.md",
+    ])
+
+    expect(executorPacket.summary).toContain("Executor Focus")
+    expect(executorPacket.files.map((file) => file.relativePath)).toEqual([
+      "docs/design-system.md",
+      "docs/design-learned.md",
+    ])
+
+    expect(reviewerPacket.summary).toContain("Reviewer Focus")
+    expect(reviewerPacket.files.map((file) => file.relativePath)).toEqual([
+      "docs/copy-voice.md",
+      "docs/design-learned.md",
+    ])
+  })
+
+  test("changes selected memory when the request type changes", () => {
+    testDir = mkdtempSync(join(tmpdir(), "design-memory-request-type-"))
+    mkdirSync(join(testDir, "docs"), { recursive: true })
+    writeFileSync(join(testDir, "docs", "design-system.md"), "color tokens spacing ".repeat(30))
+    writeFileSync(join(testDir, "docs", "copy-rules.md"), "voice tone CTA labels ".repeat(30))
+
+    const config = {
+      enabled: true,
+      docs_first: true,
+      docs_root: "docs",
+      docs_globs: ["**/*.md"],
+      prefer_docs_types: [],
+      auto_load_for_comment_resolution: true,
+      max_docs_files: 1,
+      max_chars_per_file: 120,
+      max_total_chars: 160,
+      files: [],
+    }
+
+    const copyPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Update the label",
+      role: "planner",
+      requestType: "copy_change",
+      config,
+    })
+    const colorPacket = loadDesignMemoryPacket({
+      directory: testDir,
+      prompt: "Update the label",
+      role: "planner",
+      requestType: "color_update",
+      config,
+    })
+
+    expect(copyPacket.files.map((file) => file.relativePath)).toEqual([
+      "docs/copy-rules.md",
+    ])
+    expect(colorPacket.files.map((file) => file.relativePath)).toEqual([
+      "docs/design-system.md",
+    ])
+  })
+
   test("returns empty packet when disabled", () => {
     const packet = loadDesignMemoryPacket({
       directory: process.cwd(),

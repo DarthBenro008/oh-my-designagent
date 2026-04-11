@@ -115,11 +115,21 @@ export async function createBuiltinAgents(
     browserProvider,
     disabledSkills,
   );
-  const designMemoryPacket = loadDesignMemoryPacket({
+  const plannerMemorySummary = loadDesignMemoryPacket({
     directory,
     config: designMemoryConfig,
-  });
-  const memorySummary = designMemoryPacket.summary;
+    role: "planner",
+  }).summary;
+  const executorMemorySummary = loadDesignMemoryPacket({
+    directory,
+    config: designMemoryConfig,
+    role: "executor",
+  }).summary;
+  const reviewerMemorySummary = loadDesignMemoryPacket({
+    directory,
+    config: designMemoryConfig,
+    role: "reviewer",
+  }).summary;
   const figmaUseEnabled = figmaUseConfig?.enabled ?? false;
   const figmaUseServerName = figmaUseConfig?.mcp_server_name ?? "figma-daemon";
   const figmaUseMode: FigmaUseMode = figmaUseConfig?.mode ?? "mcp";
@@ -131,7 +141,7 @@ export async function createBuiltinAgents(
       (model: string) =>
         createDesignAuditorAgent({
           model,
-          memorySummary,
+          memorySummary: reviewerMemorySummary,
           figmaUseEnabled,
           figmaUseServerName,
           figmaUseMode,
@@ -145,7 +155,7 @@ export async function createBuiltinAgents(
       (model: string) =>
         createCommentPlannerAgent({
           model,
-          memorySummary,
+          memorySummary: plannerMemorySummary,
           figmaUseEnabled,
           figmaUseServerName,
           figmaUseMode,
@@ -156,7 +166,7 @@ export async function createBuiltinAgents(
       (model: string) =>
         createVisionReviewerAgent({
           model,
-          memorySummary,
+          memorySummary: reviewerMemorySummary,
         }),
       { mode: "subagent" as const },
     ),
@@ -197,7 +207,7 @@ export async function createBuiltinAgents(
     directory,
     userCategories: categories,
     useTaskSystem,
-    memorySummary,
+    memorySummary: plannerMemorySummary,
     figmaUseEnabled,
     figmaUseServerName,
     figmaUseMode,
@@ -218,7 +228,7 @@ export async function createBuiltinAgents(
     availableCategories,
     mergedCategories,
     directory,
-    memorySummary,
+    memorySummary: executorMemorySummary,
     figmaUseEnabled,
     figmaUseServerName,
     figmaUseMode,
@@ -244,7 +254,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     userCategories: categories,
-    memorySummary,
+    memorySummary: plannerMemorySummary,
     figmaUseEnabled,
     figmaUseServerName,
     figmaUseMode,

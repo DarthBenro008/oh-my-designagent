@@ -5,8 +5,10 @@ import type {
   DesignMemoryFile,
   DesignMemoryFileType,
 } from "../config"
+import type { CommentRequestType } from "./comment-classification"
 
 type MemorySource = "docs" | "config"
+export type DesignMemoryRole = "planner" | "executor" | "reviewer" | "question"
 
 interface DesignMemoryCandidate {
   file: DesignMemoryFile
@@ -68,10 +70,106 @@ const DOCS_PRIORITY_BY_TYPE: Record<DesignMemoryFileType, number> = {
   historical_learnings: 70,
   custom: 64,
 }
+const ROLE_PRIORITY_BY_TYPE: Record<
+  DesignMemoryRole,
+  Partial<Record<DesignMemoryFileType, number>>
+> = {
+  planner: {
+    product_context: 16,
+    user_behavior: 14,
+    historical_learnings: 10,
+    design_style: 6,
+    copy_context: 4,
+  },
+  executor: {
+    design_style: 18,
+    historical_learnings: 16,
+    product_context: 10,
+    user_behavior: 6,
+    copy_context: 4,
+  },
+  reviewer: {
+    historical_learnings: 18,
+    design_style: 14,
+    copy_context: 12,
+    product_context: 6,
+    user_behavior: 6,
+  },
+  question: {
+    product_context: 10,
+    design_style: 8,
+    copy_context: 8,
+    user_behavior: 6,
+    historical_learnings: 4,
+  },
+}
+const REQUEST_PRIORITY_BY_TYPE: Partial<
+  Record<CommentRequestType, Partial<Record<DesignMemoryFileType, number>>>
+> = {
+  copy_change: {
+    copy_context: 18,
+    historical_learnings: 6,
+    design_style: 4,
+  },
+  token_bind: {
+    design_style: 18,
+    historical_learnings: 8,
+  },
+  color_update: {
+    design_style: 16,
+    historical_learnings: 6,
+  },
+  spacing_fix: {
+    design_style: 14,
+    user_behavior: 6,
+    historical_learnings: 6,
+  },
+  typography_update: {
+    design_style: 12,
+    copy_context: 10,
+    historical_learnings: 6,
+  },
+  layout_change: {
+    product_context: 12,
+    user_behavior: 10,
+    design_style: 8,
+    historical_learnings: 6,
+  },
+  new_component: {
+    product_context: 14,
+    design_style: 12,
+    user_behavior: 8,
+    historical_learnings: 8,
+  },
+  design_improvement: {
+    product_context: 12,
+    user_behavior: 10,
+    design_style: 10,
+    historical_learnings: 8,
+  },
+}
 const docsInventoryCache = new Map<string, DocsInventoryCacheEntry>()
 const fileContentCache = new Map<string, FileContentCacheEntry>()
 const designMemoryPacketCache = new Map<string, PacketCacheEntry>()
 let docsInventoryVersionCounter = 0
+
+const DESIGN_MEMORY_ROLE_BY_AGENT: Record<string, DesignMemoryRole> = {
+  prometheus: "planner",
+  solacy: "planner",
+  sisyphus: "planner",
+  atlas: "planner",
+  "comment-conductor": "planner",
+  metis: "planner",
+  "comment-planner": "planner",
+  hephaestus: "executor",
+  "design-worker": "executor",
+  "sisyphus-junior": "executor",
+  "canvas-executor": "executor",
+  momus: "reviewer",
+  "vision-reviewer": "reviewer",
+  oracle: "reviewer",
+  "design-auditor": "reviewer",
+}
 
 function resolveMemoryPath(directory: string, filePath: string): string {
   if (path.isAbsolute(filePath)) {
@@ -131,6 +229,15 @@ function inferDocsType(relativePath: string): DesignMemoryFileType {
   const lowerPath = relativePath.toLowerCase()
 
   if (
+    lowerPath.includes("history")
+    || lowerPath.includes("decision")
+    || lowerPath.includes("learn")
+    || lowerPath.includes("retro")
+  ) {
+    return "historical_learnings"
+  }
+
+  if (
     lowerPath.includes("style")
     || lowerPath.includes("design")
     || lowerPath.includes("token")
@@ -161,16 +268,125 @@ function inferDocsType(relativePath: string): DesignMemoryFileType {
     return "copy_context"
   }
 
-  if (
-    lowerPath.includes("history")
-    || lowerPath.includes("decision")
-    || lowerPath.includes("learn")
-    || lowerPath.includes("retro")
-  ) {
-    return "historical_learnings"
+  return "product_context"
+}
+
+export function getDesignMemoryRoleForAgent(
+  agentName?: string,
+): DesignMemoryRole | undefined {
+  if (!agentName) {
+    return undefined
   }
 
-  return "product_context"
+  return DESIGN_MEMORY_ROLE_BY_AGENT[agentName.trim().toLowerCase()]
+}
+
+function inferRequestTypeFromPrompt(prompt?: string): CommentRequestType | undefined {
+  const lowerPrompt = prompt?.toLowerCase() ?? ""
+  if (!lowerPrompt) {
+    return undefined
+  }
+
+  if (
+    lowerPrompt.includes("token")
+    || lowerPrompt.includes("variable")
+    || lowerPrompt.includes("style binding")
+    || lowerPrompt.includes("bind ")
+  ) {
+    return "token_bind"
+  }
+
+  if (
+    lowerPrompt.includes("copy")
+    || lowerPrompt.includes("label")
+    || lowerPrompt.includes("cta")
+    || lowerPrompt.includes("headline")
+    || lowerPrompt.includes("microcopy")
+    || lowerPrompt.includes("wording")
+  ) {
+    return "copy_change"
+  }
+
+  if (
+    lowerPrompt.includes("typography")
+    || lowerPrompt.includes("font")
+    || lowerPrompt.includes("text size")
+    || lowerPrompt.includes("type scale")
+  ) {
+    return "typography_update"
+  }
+
+  if (
+    lowerPrompt.includes("spacing")
+    || lowerPrompt.includes("padding")
+    || lowerPrompt.includes("margin")
+    || lowerPrompt.includes("gap")
+  ) {
+    return "spacing_fix"
+  }
+
+  if (
+    lowerPrompt.includes("layout")
+    || lowerPrompt.includes("grid")
+    || lowerPrompt.includes("align")
+    || lowerPrompt.includes("flow")
+  ) {
+    return "layout_change"
+  }
+
+  if (
+    lowerPrompt.includes("component")
+    || lowerPrompt.includes("variant")
+    || lowerPrompt.includes("new screen")
+    || lowerPrompt.includes("new card")
+    || lowerPrompt.includes("new modal")
+  ) {
+    return "new_component"
+  }
+
+  if (
+    lowerPrompt.includes("color")
+    || lowerPrompt.includes("colour")
+    || lowerPrompt.includes("fill")
+    || lowerPrompt.includes("background")
+    || lowerPrompt.includes("shade")
+    || lowerPrompt.includes("tint")
+  ) {
+    return "color_update"
+  }
+
+  if (
+    lowerPrompt.includes("improve")
+    || lowerPrompt.includes("polish")
+    || lowerPrompt.includes("refine")
+    || lowerPrompt.includes("redesign")
+  ) {
+    return "design_improvement"
+  }
+
+  return undefined
+}
+
+function getRoleTypeBoost(
+  role: DesignMemoryRole | undefined,
+  type: DesignMemoryFileType,
+): number {
+  if (!role) {
+    return 0
+  }
+
+  return ROLE_PRIORITY_BY_TYPE[role]?.[type] ?? 0
+}
+
+function getRequestTypeBoost(
+  requestType: CommentRequestType | undefined,
+  type: DesignMemoryFileType,
+): number {
+  if (!requestType) {
+    return 0
+  }
+
+  return REQUEST_PRIORITY_BY_TYPE[requestType]?.[type] ?? 0
 }
 
 function globToRegExp(glob: string): RegExp {
@@ -364,11 +580,15 @@ function createPacketCacheKey(args: {
   config: DesignMemoryConfig
   promptBucket: string
   docsInventoryVersion: number
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
 }): string {
   return JSON.stringify({
     directory: path.resolve(args.directory),
     docsInventoryVersion: args.docsInventoryVersion,
     promptBucket: args.promptBucket,
+    role: args.role ?? null,
+    requestType: args.requestType ?? null,
     docsFirst: args.config.docs_first,
     preferDocsTypes: [...args.config.prefer_docs_types],
     maxDocsFiles: args.config.max_docs_files,
@@ -399,8 +619,17 @@ function scoreDocsCandidate(args: {
   type: DesignMemoryFileType
   prompt?: string
   preferDocsTypes: DesignMemoryFileType[]
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
 }): number {
-  const { relativePath, type, prompt, preferDocsTypes } = args
+  const {
+    relativePath,
+    type,
+    prompt,
+    preferDocsTypes,
+    role,
+    requestType,
+  } = args
   const lowerPath = relativePath.toLowerCase()
   const promptTokens = new Set(tokenize(prompt ?? ""))
   const pathTokens = tokenize(relativePath)
@@ -429,6 +658,9 @@ function scoreDocsCandidate(args: {
     score += 12
   }
 
+  score += getRoleTypeBoost(role, type)
+  score += getRequestTypeBoost(requestType, type)
+
   for (const token of pathTokens) {
     if (promptTokens.has(token)) {
       score += 6
@@ -443,6 +675,31 @@ function scoreDocsCandidate(args: {
     score += 4
   }
 
+  if (
+    type === "historical_learnings"
+    && (
+      promptTokens.has("regression")
+      || promptTokens.has("regressions")
+      || promptTokens.has("learned")
+      || promptTokens.has("mistake")
+      || promptTokens.has("mistakes")
+    )
+  ) {
+    score += 12
+  }
+
+  if (
+    role === "reviewer"
+    && type === "historical_learnings"
+    && (
+      promptTokens.has("review")
+      || promptTokens.has("audit")
+      || promptTokens.has("verify")
+    )
+  ) {
+    score += 6
+  }
+
   return Math.max(0, Math.min(100, score))
 }
 
@@ -450,6 +707,8 @@ function createDocsCandidates(args: {
   config: DesignMemoryConfig
   docsInventory: DocsInventoryCacheEntry
   prompt?: string
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
 }): DesignMemoryCandidate[] {
   const candidates = args.docsInventory.files
     .map((file) => ({
@@ -461,6 +720,8 @@ function createDocsCandidates(args: {
           type: file.type,
           prompt: args.prompt,
           preferDocsTypes: args.config.prefer_docs_types,
+          role: args.role,
+          requestType: args.requestType,
         }),
         tags: [],
         required: false,
@@ -482,6 +743,9 @@ function createDocsCandidates(args: {
 function createConfiguredCandidates(args: {
   directory: string
   config: DesignMemoryConfig
+  prompt?: string
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
 }): { required: DesignMemoryCandidate[]; optional: DesignMemoryCandidate[] } {
   const required: DesignMemoryCandidate[] = []
   const optional: DesignMemoryCandidate[] = []
@@ -489,12 +753,30 @@ function createConfiguredCandidates(args: {
   for (const file of args.config.files) {
     const resolvedPath = resolveMemoryPath(args.directory, file.path)
     const relativePath = toRelativePath(args.directory, resolvedPath)
+    const score = Math.max(
+      0,
+      Math.min(
+        100,
+        file.priority
+          + getRoleTypeBoost(args.role, file.type)
+          + getRequestTypeBoost(args.requestType, file.type)
+          + scoreDocsCandidate({
+            relativePath,
+            type: file.type,
+            prompt: args.prompt,
+            preferDocsTypes: args.config.prefer_docs_types,
+            role: args.role,
+            requestType: args.requestType,
+          })
+          - DOCS_PRIORITY_BY_TYPE[file.type],
+      ),
+    )
     const candidate: DesignMemoryCandidate = {
       file,
       resolvedPath,
       relativePath,
       source: "config",
-      score: file.priority,
+      score,
     }
 
     if (file.required) {
@@ -510,28 +792,75 @@ function createConfiguredCandidates(args: {
   return { required, optional }
 }
 
-function formatSummary(files: LoadedDesignMemoryFile[]): string {
-  return files.map(({ file, relativePath, content, source }) => {
+function buildRoleSummaryIntro(args: {
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
+}): string | undefined {
+  const requestSuffix = args.requestType
+    ? ` for \`${args.requestType}\` requests`
+    : ""
+
+  switch (args.role) {
+    case "planner":
+      return [
+        "### Planner Focus",
+        `Prioritize product context, user behavior, and prior design learnings${requestSuffix} before locking the plan.`,
+      ].join("\n")
+    case "executor":
+      return [
+        "### Executor Focus",
+        `Prioritize design-system rules, concrete implementation guardrails, and historical learnings${requestSuffix} before mutating.`,
+      ].join("\n")
+    case "reviewer":
+      return [
+        "### Reviewer Focus",
+        `Prioritize compliance evidence, copy/design fidelity, and prior regressions${requestSuffix} while judging the outcome.`,
+      ].join("\n")
+    case "question":
+      return [
+        "### Question Focus",
+        `Prioritize product and design-system context${requestSuffix} so answers stay grounded in project guidance.`,
+      ].join("\n")
+    default:
+      return undefined
+  }
+}
+
+function formatSummary(args: {
+  files: LoadedDesignMemoryFile[]
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
+}): string {
+  const sections = args.files.map(({ file, relativePath, content, source }) => {
     const tags = file.tags.length > 0 ? ` | tags: ${file.tags.join(", ")}` : ""
     return [
       `### ${file.type} | ${relativePath} | source: ${source}${tags}`,
       content,
     ].join("\n")
-  }).join("\n\n---\n\n")
+  })
+  const intro = buildRoleSummaryIntro({
+    role: args.role,
+    requestType: args.requestType,
+  })
+
+  return [intro, ...sections].filter(Boolean).join("\n\n---\n\n")
 }
 
 export function loadDesignMemoryPacket(args: {
   directory?: string
   config?: DesignMemoryConfig
   prompt?: string
+  role?: DesignMemoryRole
+  requestType?: CommentRequestType
 }): DesignMemoryPacket {
-  const { directory = process.cwd(), config, prompt } = args
+  const { directory = process.cwd(), config, prompt, role } = args
 
   if (!config?.enabled) {
     return { summary: "", files: [] }
   }
 
   const promptBucket = normalizePromptBucket(prompt)
+  const requestType = args.requestType ?? inferRequestTypeFromPrompt(prompt)
   const docsInventory = config.docs_first
     ? getDocsInventory({ directory, config })
     : null
@@ -540,6 +869,8 @@ export function loadDesignMemoryPacket(args: {
     config,
     promptBucket,
     docsInventoryVersion: docsInventory?.version ?? 0,
+    role,
+    requestType,
   })
   const cachedPacket = getCachedPacket(packetCacheKey)
   if (cachedPacket) {
@@ -547,9 +878,15 @@ export function loadDesignMemoryPacket(args: {
   }
 
   const docsCandidates = docsInventory
-    ? createDocsCandidates({ config, docsInventory, prompt })
+    ? createDocsCandidates({ config, docsInventory, prompt, role, requestType })
     : []
-  const configuredCandidates = createConfiguredCandidates({ directory, config })
+  const configuredCandidates = createConfiguredCandidates({
+    directory,
+    config,
+    prompt,
+    role,
+    requestType,
+  })
 
   const selectedCandidates = [
     ...docsCandidates,
@@ -598,7 +935,7 @@ export function loadDesignMemoryPacket(args: {
   }
 
   const packet = {
-    summary: formatSummary(loaded),
+    summary: formatSummary({ files: loaded, role, requestType }),
     files: loaded,
   }
   designMemoryPacketCache.set(packetCacheKey, {

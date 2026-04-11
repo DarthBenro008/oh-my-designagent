@@ -144,6 +144,7 @@ export async function applyAgentConfig(params: {
   const designMemoryPacket = loadDesignMemoryPacket({
     directory: params.ctx.directory,
     config: params.pluginConfig.design_memory,
+    role: "executor",
   });
 
   const builtinAgents = await createBuiltinAgents(
