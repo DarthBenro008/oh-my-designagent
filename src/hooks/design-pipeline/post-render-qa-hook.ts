@@ -45,7 +45,7 @@ const pendingCommands = new Map<string, string>();
 
 const QA_REMINDER = `[POST-RENDER QA] You mutated the Figma canvas but haven't completed verification yet.
 
-Required verification steps before replying or resolving:
+Required verification steps before replying:
 1. Export a screenshot: \`figma-daemon export node <nodeId> --output /tmp/after.png\`
 2. Run lint: \`figma-daemon lint --root <nodeId> -v\`
 3. Check bindings: \`figma-daemon node bindings <nodeId>\``;
@@ -124,11 +124,6 @@ function extractReplyTarget(command: string): string | undefined {
   return match?.[1]?.replace(/^["'`]|["'`]$/g, "");
 }
 
-function extractResolveTarget(command: string): string | undefined {
-  const match = command.match(/figma-daemon\s+comment\s+resolve\s+([^\s]+)/i);
-  return match?.[1]?.replace(/^["'`]|["'`]$/g, "");
-}
-
 function normalizeThreadId(value: string | undefined): string | undefined {
   return value?.trim().replace(/^["'`]|["'`]$/g, "");
 }
@@ -172,7 +167,6 @@ export function createPostRenderQaHook(ctx: PluginInput) {
       const expectedThreadId = normalizeThreadId(designState.threadId);
 
       const replyTarget = normalizeThreadId(extractReplyTarget(command));
-      const resolveTarget = normalizeThreadId(extractResolveTarget(command));
       const includesCommentAdd = normalized.includes("figma-daemon comment add");
       const includesCommentResolve = normalized.includes("figma-daemon comment resolve");
 
@@ -190,24 +184,13 @@ export function createPostRenderQaHook(ctx: PluginInput) {
         }
       }
 
-      if (expectedThreadId && includesCommentResolve) {
-        if (!resolveTarget) {
-          throw new Error(
-            `[THREAD-REPLY] Comment resolve must target thread \`${expectedThreadId}\`.`,
-          );
-        }
-
-        if (resolveTarget !== expectedThreadId) {
-          throw new Error(
-            `[THREAD-REPLY] Comment resolve targets the wrong thread. Expected \`${expectedThreadId}\`, received \`${resolveTarget}\`.`,
-          );
-        }
-
-        if (state?.repliedThreadId !== expectedThreadId && !includesCommentAdd) {
-          throw new Error(
-            `[THREAD-REPLY] Resolve is blocked until a reply is posted to thread \`${expectedThreadId}\`.`,
-          );
-        }
+      if (
+        includesCommentResolve
+        && (designState.isDesignSession || expectedThreadId)
+      ) {
+        throw new Error(
+          "[THREAD-REPLY] Solacy leaves Figma comments open for human review. Reply with `--reply <threadRootId>`; do not resolve.",
+        );
       }
 
       if (!state?.hasPendingMutation) {

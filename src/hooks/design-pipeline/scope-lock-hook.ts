@@ -15,6 +15,7 @@ const CANVAS_MUTATION_PATTERNS = [
   "figma-daemon node clone ",
   "figma-daemon node rename ",
   "figma-daemon node replace-with ",
+  "figma-daemon diff apply",
   "figma-daemon render",
   "figma-daemon create ",
   "figma-daemon import",
@@ -275,9 +276,21 @@ export function createScopeLockHook(ctx: PluginInput) {
         return;
       }
 
+      if (!resolvedState.designPlan) {
+        throw new Error(
+          "[DESIGN-PLAN] No `## Design Plan` block was found in this session. Emit a plan artifact with Plan Mode, Mutation Steps, Verification Steps, and Review Requirements before mutating the Figma canvas.",
+        );
+      }
+
+      if (resolvedState.designPlan.status !== "ready") {
+        throw new Error(
+          `[DESIGN-PLAN] Design plan status must be \`ready\` before mutating the Figma canvas. Current status: ${resolvedState.designPlan.status}.`,
+        );
+      }
+
       if (!resolvedState.editIntent) {
         throw new Error(
-          "[DESIGN-INTENT] No `Edit Intent` classification was found in this session. Emit the Classification block with Edit Intent before mutating the Figma canvas.",
+          "[DESIGN-INTENT] No `Edit Intent` classification was found in this session. Emit a valid Design Plan artifact with Edit Intent before mutating the Figma canvas.",
         );
       }
 

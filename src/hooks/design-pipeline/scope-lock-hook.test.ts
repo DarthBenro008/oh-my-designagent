@@ -29,6 +29,8 @@ function buildClassificationBlock(args: {
   editIntent?: string;
   requestType?: string;
   targetNode?: string;
+  includePlan?: boolean;
+  planStatus?: string;
 }): string {
   const lines = [
     "Resolve this Figma comment.",
@@ -47,6 +49,34 @@ function buildClassificationBlock(args: {
   lines.push("- Scope Mode: subtree");
   if (args.targetNode) {
     lines.push(`- Target Node: ${args.targetNode}`);
+  }
+
+  if (args.includePlan) {
+    lines.push(
+      "",
+      "## Design Plan",
+      "- Request ID: req-1",
+      "- Source Type: comment",
+      ...(args.targetNode ? [`- Target Node: ${args.targetNode}`] : []),
+      "- Thread ID: thread-123",
+      `- Request Type: ${args.requestType ?? "copy_change"}`,
+      `- Edit Intent: ${args.editIntent ?? "text_only"}`,
+      "- Difficulty: easy",
+      "- Plan Mode: micro",
+      "- Created By: Prometheus",
+      `- Status: ${args.planStatus ?? "ready"}`,
+      "",
+      "### Mutation Steps",
+      "- Apply the approved mutation inside the scoped target",
+      "",
+      "### Verification Steps",
+      "- Export the after screenshot",
+      "- Run lint",
+      "",
+      "### Review Requirements",
+      "- Vision Reviewer",
+      "- Design Auditor",
+    );
   }
 
   return lines.join("\n");
@@ -69,7 +99,7 @@ describe("createScopeLockHook", () => {
     ).resolves.toBeUndefined();
   });
 
-  test("requires an Edit Intent classification before design mutations", async () => {
+  test("requires a design plan artifact before design mutations", async () => {
     const hook = createScopeLockHook(
       createDesignCtx([
         "Resolve this Figma comment.\n## Target\n- Node: `1:23`",
@@ -81,7 +111,22 @@ describe("createScopeLockHook", () => {
         { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
         { args: { command: 'figma-daemon set fill 1:23 "#FF0000"' } } as any,
       ),
-    ).rejects.toThrow("Edit Intent");
+    ).rejects.toThrow("Design Plan");
+  });
+
+  test("treats figma-daemon diff apply as a guarded mutation", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        "Resolve this Figma comment.\n## Target\n- Node: `1:23`",
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: "figma-daemon diff apply /tmp/patch.json" } } as any,
+      ),
+    ).rejects.toThrow("Design Plan");
   });
 
   test("allows text-only mutations on existing text nodes", async () => {
@@ -91,6 +136,7 @@ describe("createScopeLockHook", () => {
           editIntent: "text_only",
           requestType: "copy_change",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -103,6 +149,27 @@ describe("createScopeLockHook", () => {
     ).resolves.toBeUndefined();
   });
 
+  test("blocks mutations when the design plan is not ready", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "text_only",
+          requestType: "copy_change",
+          targetNode: "1:23",
+          includePlan: true,
+          planStatus: "clarify",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set text 1:23 "Updated copy"' } } as any,
+      ),
+    ).rejects.toThrow("status must be `ready`");
+  });
+
   test("blocks frame mutations for text-only intent", async () => {
     const hook = createScopeLockHook(
       createDesignCtx([
@@ -110,6 +177,7 @@ describe("createScopeLockHook", () => {
           editIntent: "text_only",
           requestType: "copy_change",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -129,6 +197,7 @@ describe("createScopeLockHook", () => {
           editIntent: "frame_props_only",
           requestType: "color_update",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -148,6 +217,7 @@ describe("createScopeLockHook", () => {
           editIntent: "frame_props_only",
           requestType: "spacing_fix",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -167,6 +237,7 @@ describe("createScopeLockHook", () => {
           editIntent: "create_variants",
           requestType: "design_improvement",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -186,6 +257,7 @@ describe("createScopeLockHook", () => {
           editIntent: "create_variants",
           requestType: "design_improvement",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );
@@ -207,6 +279,7 @@ describe("createScopeLockHook", () => {
           editIntent: "create_variants",
           requestType: "design_improvement",
           targetNode: "1:23",
+          includePlan: true,
         }),
       ]),
     );

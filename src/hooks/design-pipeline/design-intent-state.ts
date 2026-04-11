@@ -1,11 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { normalizeSDKResponse } from "../../shared";
+import {
+  extractLatestDesignPlan,
+  normalizeSDKResponse,
+} from "../../shared";
 import { log } from "../../shared/logger";
 import {
   getDefaultEditIntent,
   type CommentEditIntent,
   type CommentRequestType,
 } from "../../shared/comment-classification";
+import type { DesignPlanArtifact } from "../../shared/design-plan";
 
 const NODE_ID_PATTERN = /\bI?\d+:\d+(?:;\d+:\d+)*\b/g;
 const CACHE_TTL_MS = 1000;
@@ -27,10 +31,12 @@ type CachedDesignIntentState = {
   state: {
     isDesignSession: boolean;
     requiresClassification: boolean;
+    requiresPlan: boolean;
     editIntent?: CommentEditIntent;
     requestType?: CommentRequestType;
     targetNodeId?: string;
     threadId?: string;
+    designPlan?: DesignPlanArtifact;
     discoveredNodeIds: string[];
     approvedNodeIds: string[];
     variantCloneIds: string[];
@@ -40,10 +46,12 @@ type CachedDesignIntentState = {
 export type DesignIntentState = {
   isDesignSession: boolean;
   requiresClassification: boolean;
+  requiresPlan: boolean;
   editIntent?: CommentEditIntent;
   requestType?: CommentRequestType;
   targetNodeId?: string;
   threadId?: string;
+  designPlan?: DesignPlanArtifact;
   discoveredNodeIds: Set<string>;
   approvedNodeIds: Set<string>;
   variantCloneIds: Set<string>;
@@ -150,10 +158,12 @@ function toRuntimeState(
   return {
     isDesignSession: cached.isDesignSession,
     requiresClassification: cached.requiresClassification,
+    requiresPlan: cached.requiresPlan,
     editIntent: cached.editIntent,
     requestType: cached.requestType,
     targetNodeId: cached.targetNodeId,
     threadId: cached.threadId,
+    designPlan: cached.designPlan,
     discoveredNodeIds: cloneSet(cached.discoveredNodeIds),
     approvedNodeIds: cloneSet(cached.approvedNodeIds),
     variantCloneIds: cloneSet(cached.variantCloneIds),
@@ -166,10 +176,12 @@ function cacheState(sessionID: string, state: DesignIntentState): void {
     state: {
       isDesignSession: state.isDesignSession,
       requiresClassification: state.requiresClassification,
+      requiresPlan: state.requiresPlan,
       editIntent: state.editIntent,
       requestType: state.requestType,
       targetNodeId: state.targetNodeId,
       threadId: state.threadId,
+      designPlan: state.designPlan,
       discoveredNodeIds: [...state.discoveredNodeIds],
       approvedNodeIds: [...state.approvedNodeIds],
       variantCloneIds: [...state.variantCloneIds],
@@ -184,6 +196,7 @@ function isDesignSession(texts: string[], targetNodeId?: string): boolean {
 
   return texts.some((text) =>
     text.includes("Resolve this Figma comment.")
+    || text.includes("## Design Plan")
     || (
       text.includes("Follow the structured design pipeline")
       && text.includes("## Target")
@@ -248,31 +261,38 @@ export async function resolveDesignIntentState(
   }
 
   const texts = getAllTexts(messages);
+  const designPlan = extractLatestDesignPlan(texts);
   const targetNodeId = extractLatestMatch(texts, [
     /-\s*Target Node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
     /-\s*Node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
     /target node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
-  ]);
+  ]) ?? designPlan?.targetNodeId;
   const threadId = extractLatestMatch(texts, [
     /-\s*Thread ID:\s*`?([^\n`]+)`?/i,
     /Thread root ID:\s*`?([^\n`]+)`?/i,
-  ]);
+  ]) ?? designPlan?.threadId;
 
   const rawRequestType = extractLatestMatch(texts, [
     /-\s*Request Type:\s*([a-z_]+)/i,
   ]);
-  const requestType = rawRequestType && isCommentRequestType(rawRequestType)
-    ? rawRequestType
-    : undefined;
+  const requestType = designPlan?.requestType
+    ?? (
+      rawRequestType && isCommentRequestType(rawRequestType)
+        ? rawRequestType
+        : undefined
+    );
 
   const rawEditIntent = extractLatestMatch(texts, [
     /-\s*Edit Intent:\s*([a-z_]+)/i,
   ]);
-  const editIntent = rawEditIntent && isCommentEditIntent(rawEditIntent)
-    ? rawEditIntent
-    : requestType
-      ? getDefaultEditIntent(requestType)
-      : undefined;
+  const editIntent = designPlan?.editIntent
+    ?? (
+      rawEditIntent && isCommentEditIntent(rawEditIntent)
+        ? rawEditIntent
+        : requestType
+          ? getDefaultEditIntent(requestType)
+          : undefined
+    );
 
   const discoveredNodeIds = collectNodeIds(texts);
   const approvedNodeIds = cloneSet(approvedNodeIdsBySession.get(sessionID));
@@ -281,16 +301,19 @@ export async function resolveDesignIntentState(
   const state: DesignIntentState = {
     isDesignSession: isDesignSession(texts, targetNodeId),
     requiresClassification: false,
+    requiresPlan: false,
     editIntent,
     requestType,
     targetNodeId,
     threadId,
+    designPlan,
     discoveredNodeIds,
     approvedNodeIds,
     variantCloneIds,
   };
 
   state.requiresClassification = state.isDesignSession && !state.editIntent;
+  state.requiresPlan = state.isDesignSession && !state.designPlan;
 
   cacheState(sessionID, state);
 

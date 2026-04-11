@@ -4,6 +4,7 @@ import {
   buildDelegationPrompt,
 } from "./pipeline-context";
 import type { CommentClassification } from "./comment-classification";
+import type { DesignPlanArtifact } from "./design-plan";
 
 describe("buildClassificationBlock", () => {
   describe("#given a classification", () => {
@@ -58,6 +59,23 @@ describe("buildDelegationPrompt", () => {
 
   describe("#given classification and outputs", () => {
     test("#when called #then includes all available sections", () => {
+      const designPlan: DesignPlanArtifact = {
+        requestId: "req-1",
+        sourceType: "comment",
+        targetNodeId: "1:23",
+        threadId: "thread-2",
+        requestType: "color_update",
+        editIntent: "frame_props_only",
+        difficulty: "easy",
+        planMode: "micro",
+        mutationSteps: ["Update button fill to the approved token"],
+        verificationSteps: ["Run export, lint, and bindings checks"],
+        reviewRequirements: ["Vision Reviewer", "Design Auditor"],
+        memoryContextRefs: ["design-system.md"],
+        createdByAgent: "Prometheus",
+        status: "ready",
+      };
+
       const result = buildDelegationPrompt(
         {
           classification: {
@@ -78,6 +96,7 @@ describe("buildDelegationPrompt", () => {
               isReply: true,
             },
           },
+          designPlan,
           plannerOutput: "Plan: update the primary button color.",
           executorOutput: "Executor: applied color tokens.",
           reviewerOutput: "Reviewer: looks good.",
@@ -86,6 +105,10 @@ describe("buildDelegationPrompt", () => {
       );
 
       expect(result).toContain("Classification");
+      expect(result).toContain("## Design Plan");
+      expect(result).toContain("Request ID: req-1");
+      expect(result).toContain("Plan Mode: micro");
+      expect(result).toContain("Vision Reviewer");
       expect(result).toContain("Plan: update the primary button color.");
       expect(result).toContain("Executor: applied color tokens.");
       expect(result).toContain("Reviewer: looks good.");

@@ -77,10 +77,11 @@ Rules:
 
   return `## Figma Execution Surface
 
-Use the \`${serverName ?? "figma-daemon"}\` MCP server as the source of truth for Figma Plugin API access.
+Use the \`${serverName ?? "figma-daemon"}\` MCP server as the source of truth for inspection and read-heavy Figma Plugin API access.
 
 Rules:
 - Inspect the canvas or target node before proposing a mutation.
+- In plan-controlled design sessions, do not mutate via MCP tools directly. Route plan-gated mutations through the \`figma-daemon\` CLI via Bash so scope-lock and post-render guards can enforce the Design Plan artifact.
 - Prefer the smallest patch that resolves the comment.
 - For direct comment work, do not invent a browser or REST fallback if figma-daemon can answer the question.
 - After changes, inspect or export again so review agents can verify the result.`;
@@ -155,12 +156,12 @@ function buildThreadingProtocolSection(
 - Thread root ID = parent_id if present, otherwise the triggering comment ID.
 - Reply to the thread root, never the leaf comment ID.
 - If routing = "clarify", reply with 1-3 precise questions and STOP. Do not mutate the canvas and do not resolve.
-- After any mutation, finish verification before replying or resolving.
+- After any mutation, finish verification before replying.
+- Leave the Figma comment open for human review. Do not resolve it.
 
 Use exactly:
 \`\`\`bash
 figma-daemon comment add "<summary of what changed and why>" --reply ${threadIdPlaceholder}
-figma-daemon comment resolve ${threadIdPlaceholder}
 \`\`\``;
 }
 
@@ -215,11 +216,11 @@ If no nodeId is provided, start with: \`figma-daemon comment list --json\` to ge
 1. Read the whole comment thread and derive the thread root ID
 2. Gather context (one compound bash call)
 3. Delegate to Comment Planner — pass the full thread + pre-gathered context
-4. Read planner output: editIntent, requestType, confidence, routing, scopeMode
+4. Read planner output: classification + Design Plan artifact (planMode, mutationSteps, verificationSteps, reviewRequirements)
 5. If routing = "clarify": reply in the thread with 1-3 precise questions, then stop without mutating or resolving
-6. Delegate to Canvas Executor — include the classification block + pre-gathered context + scope lock + intent guard
+6. Delegate to Canvas Executor — include the Design Plan block + classification block + pre-gathered context + scope lock + intent guard
 7. Delegate to Vision Reviewer + Design Auditor in parallel after mutation
-8. If both approve and verification is complete: reply in the thread, then resolve the thread root
+8. If both approve and verification is complete: reply to the thread root and leave it open for human review
 9. If rejected: retry the executor once with correction notes, then decide whether to reply with a partial result
 
 Comment resolution protocol:
@@ -227,7 +228,7 @@ Comment resolution protocol:
 - If Edit Intent = \`text_only\`, inspect the whole frame subtree and only edit text nodes.
 - If Edit Intent = \`create_variants\`, create sibling clone frames/components first and keep the original source untouched.
 - If Routing = \`clarify\`, reply with the question(s) and stop. Do not resolve.
-- Never resolve a thread without replying first, and never reply or resolve before verification is complete.
+- Never resolve Figma comments in autonomous Solacy workflows, and never reply before verification is complete.
 
 ${buildThreadingProtocolSection()}`,
     permission: {
@@ -344,7 +345,7 @@ Combine with && echo "---SEPARATOR---" && between each command.
 
 **Step 2 — Delegate to Comment Planner (metis)**
 Pass: the full comment thread, nodeId, thread root ID, and pre-gathered context (node tree + JSX + bindings).
-The planner returns: editIntent, requestType, difficulty, confidence (0-100), routing, scopeMode.
+The planner returns: a Classification block plus a Design Plan artifact with planMode, mutationSteps, verificationSteps, reviewRequirements, and planner notes.
 
 **Step 3 — Route based on routing**
 - "proceed": Execute directly (easy) or with variants (medium -> 2 variants, hard -> 3 variants).
@@ -353,6 +354,7 @@ The planner returns: editIntent, requestType, difficulty, confidence (0-100), ro
 
 **Step 4 — Delegate to Canvas Executor (sisyphus-junior)**
 Include in delegation prompt:
+- Design Plan block (request ID, plan mode, mutation steps, verification steps, review requirements, created by, status)
 - Classification block (editIntent, requestType, difficulty, confidence, routing, scopeMode)
 - Pre-gathered context (node tree, JSX, bindings, before screenshot path)
 - Scope lock: "You may ONLY modify node [nodeId] and its descendants."
@@ -365,7 +367,7 @@ After executor confirms completion, delegate simultaneously:
 - Design Auditor (oracle): Pass nodeId + bindings output + lint requirement
 
 **Step 6 — Decision**
-- Both approve -> reply to comment with summary -> resolve comment
+- Both approve -> reply to the thread root with a summary and leave the comment open for human review
 - Either rejects with fixable issues -> retry executor once with correction instructions
 - Unfixable -> reply to comment explaining partial result, do NOT resolve
 
@@ -374,6 +376,23 @@ After executor confirms completion, delegate simultaneously:
 When delegating to the executor, include this structured block:
 \`\`\`
 ## Pipeline Context
+## Design Plan
+- Request ID: [request-id]
+- Source Type: [comment | direct-design-task]
+- Target Node: [nodeId or "none"]
+- Thread ID: [thread id or "none"]
+- Request Type: [type]
+- Edit Intent: [intent]
+- Difficulty: [easy | medium | hard]
+- Plan Mode: [micro | full]
+- Created By: [planner agent]
+- Status: [ready | clarify]
+### Mutation Steps
+- [step]
+### Verification Steps
+- [step]
+### Review Requirements
+- [step]
 - Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
 - Request Type: [type]
 - Difficulty: [level]
@@ -443,6 +462,7 @@ Output requirements:
 - recommended execution path
 - whether clarification is required
 - clarification questions when routing = clarify
+- a Design Plan artifact that downstream execution can consume without inventing missing steps
 
 Do not mutate files or the canvas. Planning only.
 
@@ -458,6 +478,29 @@ Always output a classification block in this exact format:
 - Routing: [proceed | retry_with_variants | clarify]
 - Scope Mode: [node_only | subtree]
 - Target Node: [nodeId or "none"]
+\`\`\`
+
+Then output a design plan block in this exact format:
+\`\`\`
+## Design Plan
+- Request ID: [stable request id]
+- Source Type: [comment | direct-design-task]
+- Target Node: [nodeId or "none"]
+- Thread ID: [threadRootId or "none"]
+- Request Type: [copy_change | token_bind | color_update | spacing_fix | typography_update | layout_change | new_component | design_improvement]
+- Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
+- Difficulty: [easy | medium | hard]
+- Plan Mode: [micro | full]
+- Created By: [Comment Planner]
+- Status: [ready | clarify]
+### Mutation Steps
+- [ordered mutation step]
+### Verification Steps
+- [ordered verification step]
+### Review Requirements
+- [Vision Reviewer | Design Auditor | both]
+### Memory Context Refs
+- [memory file or "none"]
 \`\`\`
 
 ## Request Type Classification Criteria
@@ -703,7 +746,9 @@ export function createCanvasExecutorAgent(args: {
   const restrictions = createAgentToolRestrictions(["task"]);
   const promptAppend = args.promptAppend ? `\n\n${args.promptAppend}` : "";
   const executionSurface =
-    args.figmaUseMode === "cli" ? "figma-daemon CLI" : "figma-daemon MCP";
+    args.figmaUseMode === "cli"
+      ? "figma-daemon CLI"
+      : "figma-daemon MCP for inspection plus figma-daemon CLI for plan-gated mutations";
   const config: AgentConfigWithSkills = {
     mode: SUBAGENT_MODE,
     model: args.model,
@@ -720,8 +765,9 @@ ${buildFigmaUseSection(args.figmaUseEnabled, args.figmaUseServerName, args.figma
 Execution rules:
 - You do not delegate.
 - Use ${executionSurface} as the primary execution surface when enabled.
-- Do not mutate unless the Pipeline Context already includes the Classification block.
+- Do not mutate unless the Pipeline Context already includes both the Classification block and the Design Plan block.
 - If Routing = "clarify", perform no mutation.
+- Respect the planMode and execute only the listed mutation steps.
 - Inspect before mutating.
 - For easy comment fixes, prefer the smallest direct patch.
 - For layout or creation work, render variants only when the planner or conductor requested them.
@@ -756,7 +802,7 @@ WARNING SCOPE LOCK: You may ONLY modify the target node specified in the Pipelin
 1. ALWAYS export existing JSX first: \`figma-daemon export jsx <nodeId> --pretty\`
 2. Use $Variable syntax for ALL colors -- never hardcode hex
 3. Position with --x and --y -- never render at 0,0 without intent
-4. Use defineComponent for reusable elements, defineComponentSet for variants
+4. Use defineComponent for reusable elements. Use defineComponentSet for variants only when the request explicitly asks for a component set.
 5. After rendering, check result: \`figma-daemon export node <newId> --output /tmp/check.png\`
 6. For tweaks after initial render: use \`figma-daemon set\` or \`figma-daemon diff apply\` -- NOT a full re-render
 

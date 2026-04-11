@@ -82,7 +82,8 @@ describe("createFigmaUseSkill", () => {
     expect(skill.template).toContain("set fill");
     expect(skill.template).toContain("set text");
     expect(skill.template).toContain("comment add");
-    expect(skill.template).toContain("comment resolve");
+    expect(skill.template).not.toContain("comment resolve");
+    expect(skill.template).toContain("leave Figma threads open");
   });
 
   test("returns the full CLI template for creation tasks", () => {

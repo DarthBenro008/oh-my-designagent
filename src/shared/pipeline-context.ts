@@ -1,4 +1,8 @@
 import type { CommentClassification } from "./comment-classification";
+import {
+  buildDesignPlanBlock,
+  type DesignPlanArtifact,
+} from "./design-plan";
 
 export interface CommentData {
   id: string;
@@ -22,6 +26,7 @@ export interface PreGatheredContext {
 
 export interface PipelineContext {
   classification?: CommentClassification;
+  designPlan?: DesignPlanArtifact;
   preGathered: PreGatheredContext;
   plannerOutput?: string;
   executorOutput?: string;
@@ -104,6 +109,9 @@ export function buildDelegationPrompt(
 
   if (ctx.classification) {
     sections.push(buildClassificationBlock(ctx.classification));
+  }
+  if (ctx.designPlan) {
+    sections.push(buildDesignPlanBlock(ctx.designPlan));
   }
 
   const plannerSection = buildOutputSection(

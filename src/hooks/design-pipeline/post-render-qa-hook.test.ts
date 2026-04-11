@@ -196,7 +196,7 @@ describe("createPostRenderQaHook", () => {
     ).rejects.toThrow("wrong thread");
   });
 
-  test("blocks resolve until the correct thread reply has been posted", async () => {
+  test("blocks comment resolve for design comment sessions", async () => {
     const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
 
     await expect(
@@ -208,10 +208,10 @@ describe("createPostRenderQaHook", () => {
           },
         } as any,
       ),
-    ).rejects.toThrow("Resolve is blocked");
+    ).rejects.toThrow("leaves Figma comments open");
   });
 
-  test("allows resolve after a correct reply is posted to the thread", async () => {
+  test("blocks comment resolve after a correct reply is posted to the thread", async () => {
     const hook = createPostRenderQaHook(createDesignCtx("thread-123"));
 
     await runBashCommand(hook, {
@@ -229,6 +229,6 @@ describe("createPostRenderQaHook", () => {
           },
         } as any,
       ),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("do not resolve");
   });
 });

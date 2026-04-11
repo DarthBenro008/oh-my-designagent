@@ -119,12 +119,37 @@ Before execution, write a short plan that states:
 - exact commands you expect to use
 - why the change should satisfy the comment
 
+Output this exact artifact before any mutation:
+
+\`\`\`
+## Design Plan
+- Request ID: [stable request id]
+- Source Type: [comment | direct-design-task]
+- Target Node: [nodeId or "none"]
+- Thread ID: [threadRootId or "none"]
+- Request Type: [copy_change | token_bind | color_update | spacing_fix | typography_update | layout_change | new_component | design_improvement]
+- Edit Intent: [full_redesign | text_only | frame_props_only | create_variants]
+- Difficulty: [easy | medium | hard]
+- Plan Mode: [micro | full]
+- Created By: [planner agent]
+- Status: [ready | clarify]
+### Mutation Steps
+- [ordered mutation step]
+### Verification Steps
+- [ordered verification step]
+### Review Requirements
+- [Vision Reviewer | Design Auditor | both]
+### Memory Context Refs
+- [memory file or "none"]
+\`\`\`
+
 ## PHASE 3 - EXECUTE
 
 Scope lock:
 - ONLY modify the target node and its descendants
 - Exception: if Edit Intent = create_variants, create sibling clones from the target first, then mutate ONLY those approved clone IDs
 - Never touch unrelated parents or siblings
+- Never mutate without both the Classification block and the Design Plan block present in session context
 
 Intent gate:
 - text_only: ONLY edit existing text nodes. Allowed commands are limited to text setters and text styling on those nodes.
@@ -168,21 +193,21 @@ Verification steps:
 - Check token binding hygiene and flag unbound hex values
 - Pass \`figma-daemon lint --root <nodeId>\` output through a compliance check
 
-Resolution rules:
-- If the score is acceptable, reply to the thread and then resolve it
+Reply rules:
+- If the score is acceptable, reply to the thread root and leave it open for human review
 - If the score is not acceptable and this is the first attempt, loop back to EXECUTE with corrections
 - If the score is still not acceptable after retry, reply with the partial result and explain what was done and what remains
 
 Threading rules:
-- ALWAYS reply BEFORE resolving
+- ALWAYS reply after verification succeeds
 - Use the thread root ID: parent_id if present, otherwise the triggering comment ID
 - Reply with \`--reply <threadRootId>\`, never \`--reply <commentId>\`
 - If Routing = clarify, reply with the question(s) and STOP. Do not resolve.
-- NEVER resolve without a prior reply in the same thread
+- NEVER resolve Figma comments in autonomous design-agent workflows
+- Leave the thread open for human review after your reply
 
-Use these commands in order when verification succeeds:
+Use this command when verification succeeds:
 - \`figma-daemon comment add "<summary of what changed and why>" --reply <threadRootId>\`
-- \`figma-daemon comment resolve <threadRootId>\`
 
 Stay inside the pipeline: classify first, plan second, execute third, verify last.`,
   };

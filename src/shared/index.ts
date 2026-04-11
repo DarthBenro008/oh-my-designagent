@@ -2,6 +2,7 @@ export * from "./frontmatter";
 export * from "./command-executor";
 export * from "./contains-path";
 export * from "./comment-classification";
+export * from "./design-plan";
 export * from "./pipeline-context";
 export * from "./file-reference-resolver";
 export * from "./model-sanitizer";

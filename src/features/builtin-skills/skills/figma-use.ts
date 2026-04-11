@@ -48,7 +48,7 @@ figma-daemon export screenshot --output /tmp/viewport.png
 
 # Comments
 figma-daemon comment add "Updated the requested patch" --reply <threadId>
-figma-daemon comment resolve <threadId>
+# Autonomous design-agent jobs reply only and leave Figma threads open for human review.
 
 # Tokens
 figma-daemon variable find "Colors"
