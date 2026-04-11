@@ -1,4 +1,5 @@
 export { HOOK_NAME, createStartWorkHook } from "./start-work-hook"
+export { DESIGN_PLAN_MIRROR_MARKER, syncCanonicalDesignPlansToLegacyPlans } from "./design-plan-bridge"
 export { detectWorktreePath, listWorktrees, parseWorktreeListPorcelain } from "./worktree-detector"
 export type { ParsedUserRequest } from "./parse-user-request"
 export { parseUserRequest } from "./parse-user-request"

@@ -81,6 +81,18 @@ describe("loadBuiltinCommands", () => {
     expect(commands["start-work"].agent).toBe("atlas")
   })
 
+  test("should describe start-work as a legacy/manual bridge instead of the normal design entrypoint", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["start-work"].description).toContain("legacy/manual work session")
+    expect(commands["start-work"].template).toContain("Normal design sessions should continue automatically")
+    expect(commands["start-work"].template).toContain(".omx/state/**/*.json")
+  })
+
   test("should preassign Sisyphus as the native agent for start-work when command config checks registered agents", () => {
     //#given - no atlas registration
 

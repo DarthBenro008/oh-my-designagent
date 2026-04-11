@@ -1,4 +1,7 @@
-export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
+export const START_WORK_TEMPLATE = `You are starting a legacy/manual work session bridge.
+
+Normal design sessions should continue automatically after Prometheus creates the canonical design plan.
+Use \`/start-work\` only for migration-era compatibility, manual resume flows, or legacy \`.sisyphus/plans/*.md\` execution.
 
 ## ARGUMENTS
 
@@ -11,11 +14,15 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 ## WHAT TO DO
 
-1. **Find available plans**: Search for Prometheus-generated plan files at \`.sisyphus/plans/\`
+1. **Sync canonical design plans first**: If \`.omx/state/**/*.json\` contains design-plan artifacts, mirror them into \`.sisyphus/plans/\` before continuing.
+   - Canonical precedence: \`.omx/state\` design plans override same-name legacy markdown mirrors
+   - Treat the generated markdown as a compatibility mirror only; the canonical source remains the \`.omx\` JSON artifact
 
-2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
+2. **Find available plans**: Search for Prometheus-generated or compatibility-mirrored plan files at \`.sisyphus/plans/\`
 
-3. **Decision logic**:
+3. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
+
+4. **Decision logic**:
    - If \`.sisyphus/boulder.json\` exists AND plan is NOT complete (has unchecked boxes):
      - **APPEND** current session to session_ids
      - Continue work on existing plan
@@ -24,13 +31,13 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Worktree Setup** (ONLY when \`--worktree\` was explicitly specified and \`worktree_path\` not already set in boulder.json):
+5. **Worktree Setup** (ONLY when \`--worktree\` was explicitly specified and \`worktree_path\` not already set in boulder.json):
    1. \`git worktree list --porcelain\` — see available worktrees
    2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
    3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
    4. All work happens inside that worktree directory
 
-5. **Create/Update boulder.json**:
+6. **Create/Update boulder.json**:
    \`\`\`json
    {
      "active_plan": "/absolute/path/to/plan.md",
@@ -41,7 +48,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
    }
    \`\`\`
 
-6. **Read the plan file** and start executing tasks according to atlas workflow
+7. **Read the plan file** and start executing tasks according to atlas workflow
 
 ## OUTPUT FORMAT
 
@@ -85,6 +92,8 @@ Reading plan and beginning execution...
 ## CRITICAL
 
 - The session_id is injected by the hook - use it directly
+- Do NOT present \`/start-work\` as the default design-flow handoff; it is a legacy/manual bridge
+- When a plan was mirrored from \`.omx/state\`, prefer the canonical JSON artifact for provenance/status details and treat the markdown as a compatibility surface
 - Always update boulder.json BEFORE starting work
 - If worktree_path is set in boulder.json, all work happens inside that worktree directory
 - Read the FULL plan file before delegating any tasks

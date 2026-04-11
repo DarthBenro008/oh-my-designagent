@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
@@ -33,7 +33,7 @@ describe("start-work hook", () => {
     const userRequest = options?.userRequest ?? ""
 
     return `<command-instruction>
-You are starting a Sisyphus work session.
+You are starting a legacy/manual work session bridge.
 </command-instruction>
 
 <session-context>${sessionContext}</session-context>${userRequest ? `
@@ -225,6 +225,54 @@ You are starting a Sisyphus work session.
       expect(output.parts[0].text).toContain("Auto-Selected Plan")
       expect(output.parts[0].text).toContain("plan-incomplete")
       expect(output.parts[0].text).not.toContain("Multiple Plans Found")
+    })
+
+    test("should bridge a canonical .omx design plan into .sisyphus for manual start-work", async () => {
+      // given - canonical .omx plan, no legacy markdown plan
+      const canonicalDir = join(testDir, ".omx", "state", "design-session")
+      mkdirSync(canonicalDir, { recursive: true })
+      writeFileSync(
+        join(canonicalDir, "checkout-refresh.json"),
+        JSON.stringify({
+          designPlan: {
+            requestId: "checkout-refresh",
+            sourceType: "direct-design-task",
+            targetNodeId: "node-1",
+            threadId: "thread-1",
+            requestType: "layout_change",
+            editIntent: "full_redesign",
+            difficulty: "medium",
+            planMode: "full",
+            mutationSteps: ["Adjust checkout spacing"],
+            verificationSteps: ["Export after screenshot"],
+            reviewRequirements: ["Vision Reviewer"],
+            memoryContextRefs: ["memory/checkout.md"],
+            createdByAgent: "Prometheus",
+            status: "ready",
+          },
+        }, null, 2),
+      )
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "session-123" },
+        output
+      )
+
+      // then
+      expect(output.parts[0].text).toContain("Manual Design-Plan Bridge")
+      expect(output.parts[0].text).toContain("Auto-Selected Plan")
+      expect(output.parts[0].text).toContain("checkout-refresh")
+      expect(readBoulderState(testDir)?.active_plan).toBe(join(testDir, ".sisyphus", "plans", "checkout-refresh.md"))
+
+      const mirrorContent = readFileSync(join(testDir, ".sisyphus", "plans", "checkout-refresh.md"), "utf8")
+      expect(mirrorContent).toContain("Adjust checkout spacing")
+      expect(mirrorContent).toContain("Legacy/manual compatibility mirror")
     })
 
     test("should wrap multiple plans message in system-reminder tag", async () => {

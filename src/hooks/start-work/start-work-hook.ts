@@ -23,9 +23,13 @@ import {
 } from "../../features/claude-code-session-state"
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
+import { syncCanonicalDesignPlansToLegacyPlans } from "./design-plan-bridge"
 
 export const HOOK_NAME = "start-work" as const
-const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
+const START_WORK_TEMPLATE_MARKERS = [
+  "You are starting a legacy/manual work session bridge.",
+  "You are starting a Sisyphus work session.",
+]
 
 interface StartWorkHookInput {
   sessionID: string
@@ -96,7 +100,7 @@ export function createStartWorkHook(ctx: PluginInput) {
 
     if (
       !promptText.includes("<session-context>")
-      || !promptText.includes(START_WORK_TEMPLATE_MARKER)
+      || !START_WORK_TEMPLATE_MARKERS.some((marker) => promptText.includes(marker))
     ) {
       return
     }
@@ -125,11 +129,20 @@ export function createStartWorkHook(ctx: PluginInput) {
     const existingState = readBoulderState(ctx.directory)
     const sessionId = input.sessionID
     const timestamp = new Date().toISOString()
+    const bridgedDesignPlans = syncCanonicalDesignPlansToLegacyPlans(ctx.directory)
 
     const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
     const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
 
-    let contextInfo = ""
+    const bridgeNotice = bridgedDesignPlans.length > 0
+      ? `
+## Manual Design-Plan Bridge
+
+Synced ${bridgedDesignPlans.length} canonical design plan(s) from \`.omx/state\` into \`.sisyphus/plans\` for legacy/manual \`/start-work\` compatibility.
+Use \`/start-work\` only when you are resuming a legacy/manual flow. Normal design sessions should continue automatically after planning.`
+      : ""
+
+    let contextInfo = bridgeNotice
 
     if (explicitPlanName) {
       log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, { sessionID: input.sessionID })
@@ -141,7 +154,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         const progress = getPlanProgress(matchedPlan)
 
         if (progress.isComplete) {
-          contextInfo = `
+          contextInfo = `${bridgeNotice}
 ## Plan Already Complete
 
 The requested plan "${getPlanName(matchedPlan)}" has been completed.
@@ -151,7 +164,7 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
           const newState = createBoulderState(matchedPlan, sessionId, activeAgent, worktreePath)
           writeBoulderState(ctx.directory, newState)
 
-          contextInfo = `
+          contextInfo = `${bridgeNotice}
 ## Auto-Selected Plan
 
 **Plan**: ${getPlanName(matchedPlan)}
@@ -173,7 +186,7 @@ boulder.json has been created. Read the plan and begin execution.`
             })
             .join("\n")
 
-          contextInfo = `
+          contextInfo = `${bridgeNotice}
 ## Plan Not Found
 
 Could not find a plan matching "${explicitPlanName}".
@@ -183,7 +196,7 @@ ${planList}
 
 Ask the user which plan to work on.`
         } else {
-          contextInfo = `
+          contextInfo = `${bridgeNotice}
 ## Plan Not Found
 
 Could not find a plan matching "${explicitPlanName}".
@@ -214,7 +227,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
 
         const worktreeDisplay = effectiveWorktree ? createWorktreeActiveBlock(effectiveWorktree) : worktreeBlock
 
-        contextInfo = `
+        contextInfo = `${bridgeNotice}
 ## Active Work Session Found
 
 **Status**: RESUMING existing work
@@ -228,7 +241,7 @@ ${worktreeDisplay}
 The current session (${sessionId}) has been added to session_ids.
 Read the plan file and continue from the first unchecked task.`
       } else {
-        contextInfo = `
+        contextInfo = `${bridgeNotice}
 ## Previous Work Complete
 
 The previous plan (${existingState.plan_name}) has been completed.
@@ -247,14 +260,14 @@ Looking for new plans...`
         contextInfo += `
 ## No Plans Found
 
-No Prometheus plan files found at .sisyphus/plans/
-Use Prometheus to create a work plan first: /plan "your task"`
+No legacy Prometheus plans or mirrored canonical design plans were found at \`.sisyphus/plans/\`.
+Use Prometheus to create a plan first. Normal design sessions should continue automatically after planning; use \`/start-work\` only for legacy/manual resume flows.`
       } else if (incompletePlans.length === 0) {
         contextInfo += `
 
 ## All Plans Complete
 
-All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
+All ${plans.length} bridged/legacy plan(s) are complete. Create a new plan with: /plan "your task"`
       } else if (incompletePlans.length === 1) {
         const planPath = incompletePlans[0]
         const progress = getPlanProgress(planPath)

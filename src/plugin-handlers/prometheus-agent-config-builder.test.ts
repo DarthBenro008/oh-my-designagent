@@ -96,6 +96,17 @@ describe("buildPrometheusAgentConfig", () => {
         });
         expect(result).toBeDefined();
       });
+
+      test("defaults Prometheus description to the canonical design planner identity", async () => {
+        const result = await buildPrometheusAgentConfig({
+          configAgentPlan: undefined,
+          pluginPrometheusOverride: undefined,
+          userCategories: undefined,
+          currentModel: "openai/gpt-5.4",
+        });
+
+        expect(result.description).toBe("Canonical design planner (Prometheus - OhMyOpenCode)");
+      });
     });
   });
 
