@@ -1,15 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import {
-  extractLatestDesignPlan,
-  normalizeSDKResponse,
-} from "../../shared";
 import { log } from "../../shared/logger";
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response";
 import {
   getDefaultEditIntent,
   type CommentEditIntent,
   type CommentRequestType,
 } from "../../shared/comment-classification";
-import type { DesignPlanArtifact } from "../../shared/design-plan";
+import {
+  extractLatestDesignPlan,
+  type DesignPlanArtifact,
+} from "../../shared/design-plan";
 
 const NODE_ID_PATTERN = /\bI?\d+:\d+(?:;\d+:\d+)*\b/g;
 const CACHE_TTL_MS = 1000;
@@ -26,6 +26,10 @@ type SessionMessage = {
   parts?: SessionMessagePart[];
 };
 
+type SessionInfo = {
+  parentID?: string;
+};
+
 type CachedDesignIntentState = {
   fetchedAt: number;
   state: {
@@ -37,6 +41,7 @@ type CachedDesignIntentState = {
     targetNodeId?: string;
     threadId?: string;
     designPlan?: DesignPlanArtifact;
+    planAccessSessionIds: string[];
     discoveredNodeIds: string[];
     approvedNodeIds: string[];
     variantCloneIds: string[];
@@ -52,6 +57,7 @@ export type DesignIntentState = {
   targetNodeId?: string;
   threadId?: string;
   designPlan?: DesignPlanArtifact;
+  planAccessSessionIds: Set<string>;
   discoveredNodeIds: Set<string>;
   approvedNodeIds: Set<string>;
   variantCloneIds: Set<string>;
@@ -60,6 +66,7 @@ export type DesignIntentState = {
 const approvedNodeIdsBySession = new Map<string, Set<string>>();
 const variantCloneIdsBySession = new Map<string, Set<string>>();
 const cachedStates = new Map<string, CachedDesignIntentState>();
+const SESSION_LINEAGE_DEPTH_LIMIT = 6;
 
 function cloneSet(values?: Iterable<string>): Set<string> {
   return new Set(values ?? []);
@@ -98,6 +105,90 @@ function getAllTexts(messages: SessionMessage[]): string[] {
   return messages.map(extractMessageText).filter(Boolean);
 }
 
+async function loadSessionMessages(
+  ctx: PluginInput,
+  sessionID: string,
+): Promise<SessionMessage[]> {
+  try {
+    const response = await ctx.client.session.messages({
+      path: { id: sessionID },
+    } as never);
+    const normalized = normalizeSDKResponse(
+      response,
+      [] as SessionMessage[],
+      { preferResponseOnMissingData: true },
+    );
+    return Array.isArray(normalized) ? normalized : [];
+  } catch (error) {
+    log("[design-intent-state] Failed to read session messages", {
+      sessionID,
+      error: String(error),
+    });
+    return [];
+  }
+}
+
+async function loadSessionInfo(
+  ctx: PluginInput,
+  sessionID: string,
+): Promise<SessionInfo | undefined> {
+  if (!ctx.client.session.get) {
+    return undefined;
+  }
+
+  try {
+    const response = await ctx.client.session.get({
+      path: { id: sessionID },
+    } as never);
+    const normalized = normalizeSDKResponse(
+      response,
+      {} as SessionInfo,
+      { preferResponseOnMissingData: true },
+    );
+    if (!normalized || typeof normalized !== "object") {
+      return undefined;
+    }
+
+    const candidate = normalized as SessionInfo & {
+      data?: SessionInfo;
+    };
+    return candidate.parentID !== undefined
+      ? candidate
+      : candidate.data
+        ? candidate.data
+        : undefined;
+  } catch (error) {
+    log("[design-intent-state] Failed to read session info", {
+      sessionID,
+      error: String(error),
+    });
+    return undefined;
+  }
+}
+
+async function loadSessionLineage(
+  ctx: PluginInput,
+  sessionID: string,
+): Promise<string[]> {
+  const lineage = [sessionID];
+  const visited = new Set(lineage);
+  let nextSessionID = sessionID;
+
+  for (let depth = 0; depth < SESSION_LINEAGE_DEPTH_LIMIT; depth++) {
+    const sessionInfo = await loadSessionInfo(ctx, nextSessionID);
+    const parentID = sessionInfo?.parentID;
+    if (!parentID || visited.has(parentID)) {
+      break;
+    }
+
+    lineage.push(parentID);
+    visited.add(parentID);
+    nextSessionID = parentID;
+  }
+
+  return lineage;
+}
+
 function extractLatestMatch(
   texts: string[],
   patterns: RegExp[],
@@ -113,6 +204,32 @@ function extractLatestMatch(
   }
 
   return undefined;
+}
+
+function extractLatestMatchFromGroups(
+  textGroups: string[][],
+  patterns: RegExp[],
+): string | undefined {
+  for (const texts of textGroups) {
+    const match = extractLatestMatch(texts, patterns);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+}
+
+function collectNodeIdsFromGroups(textGroups: string[][]): Set<string> {
+  const ids = new Set<string>();
+
+  for (const texts of textGroups) {
+    for (const id of collectNodeIds(texts)) {
+      ids.add(id);
+    }
+  }
+
+  return ids;
 }
 
 function collectNodeIds(texts: string[]): Set<string> {
@@ -164,6 +281,7 @@ function toRuntimeState(
     targetNodeId: cached.targetNodeId,
     threadId: cached.threadId,
     designPlan: cached.designPlan,
+    planAccessSessionIds: cloneSet(cached.planAccessSessionIds),
     discoveredNodeIds: cloneSet(cached.discoveredNodeIds),
     approvedNodeIds: cloneSet(cached.approvedNodeIds),
     variantCloneIds: cloneSet(cached.variantCloneIds),
@@ -182,6 +300,7 @@ function cacheState(sessionID: string, state: DesignIntentState): void {
       targetNodeId: state.targetNodeId,
       threadId: state.threadId,
       designPlan: state.designPlan,
+      planAccessSessionIds: [...state.planAccessSessionIds],
       discoveredNodeIds: [...state.discoveredNodeIds],
       approvedNodeIds: [...state.approvedNodeIds],
       variantCloneIds: [...state.variantCloneIds],
@@ -196,6 +315,9 @@ function isDesignSession(texts: string[], targetNodeId?: string): boolean {
 
   return texts.some((text) =>
     text.includes("Resolve this Figma comment.")
+    || text.includes("Resolve this design task.")
+    || text.includes("## Direct Design Task")
+    || text.includes("Source Type: direct-design-task")
     || text.includes("## Design Plan")
     || (
       text.includes("Follow the structured design pipeline")
@@ -241,38 +363,31 @@ export async function resolveDesignIntentState(
     return toRuntimeState(cached.state);
   }
 
-  let messages: SessionMessage[] = [];
+  const sessionLineage = await loadSessionLineage(ctx, sessionID);
+  const textGroups = await Promise.all(
+    sessionLineage.map(async (lineageSessionID) =>
+      getAllTexts(await loadSessionMessages(ctx, lineageSessionID))),
+  );
+  const [texts = []] = textGroups;
 
-  try {
-    const response = await ctx.client.session.messages({
-      path: { id: sessionID },
-    } as never);
-    const normalized = normalizeSDKResponse(
-      response,
-      [] as SessionMessage[],
-      { preferResponseOnMissingData: true },
-    );
-    messages = Array.isArray(normalized) ? normalized : [];
-  } catch (error) {
-    log("[design-intent-state] Failed to read session messages", {
-      sessionID,
-      error: String(error),
-    });
-  }
-
-  const texts = getAllTexts(messages);
-  const designPlan = extractLatestDesignPlan(texts);
-  const targetNodeId = extractLatestMatch(texts, [
+  const designPlan = textGroups
+    .map((group, index) => extractLatestDesignPlan(group, {
+      ownerSessionId: sessionLineage[index],
+    }))
+    .find((plan) => Boolean(plan));
+  const targetNodeId = designPlan?.targetNodeId
+    ?? extractLatestMatchFromGroups(textGroups, [
     /-\s*Target Node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
     /-\s*Node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
     /target node:\s*`?(I?\d+:\d+(?:;\d+:\d+)*)`?/i,
-  ]) ?? designPlan?.targetNodeId;
-  const threadId = extractLatestMatch(texts, [
+  ]);
+  const threadId = designPlan?.threadId
+    ?? extractLatestMatchFromGroups(textGroups, [
     /-\s*Thread ID:\s*`?([^\n`]+)`?/i,
     /Thread root ID:\s*`?([^\n`]+)`?/i,
-  ]) ?? designPlan?.threadId;
+  ]);
 
-  const rawRequestType = extractLatestMatch(texts, [
+  const rawRequestType = extractLatestMatchFromGroups(textGroups, [
     /-\s*Request Type:\s*([a-z_]+)/i,
   ]);
   const requestType = designPlan?.requestType
@@ -282,7 +397,7 @@ export async function resolveDesignIntentState(
         : undefined
     );
 
-  const rawEditIntent = extractLatestMatch(texts, [
+  const rawEditIntent = extractLatestMatchFromGroups(textGroups, [
     /-\s*Edit Intent:\s*([a-z_]+)/i,
   ]);
   const editIntent = designPlan?.editIntent
@@ -294,7 +409,7 @@ export async function resolveDesignIntentState(
           : undefined
     );
 
-  const discoveredNodeIds = collectNodeIds(texts);
+  const discoveredNodeIds = collectNodeIdsFromGroups(textGroups);
   const approvedNodeIds = cloneSet(approvedNodeIdsBySession.get(sessionID));
   const variantCloneIds = cloneSet(variantCloneIdsBySession.get(sessionID));
 
@@ -307,6 +422,7 @@ export async function resolveDesignIntentState(
     targetNodeId,
     threadId,
     designPlan,
+    planAccessSessionIds: cloneSet(sessionLineage),
     discoveredNodeIds,
     approvedNodeIds,
     variantCloneIds,

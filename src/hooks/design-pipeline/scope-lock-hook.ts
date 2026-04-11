@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { log } from "../../shared/logger";
+import { isExecutableDesignPlanStatus } from "../../shared/design-plan";
 import {
   clearDesignIntentState,
   resolveDesignIntentState,
@@ -282,9 +283,19 @@ export function createScopeLockHook(ctx: PluginInput) {
         );
       }
 
-      if (resolvedState.designPlan.status !== "ready") {
+      const ownerSessionId = resolvedState.designPlan.ownerSessionId;
+      if (
+        ownerSessionId
+        && !resolvedState.planAccessSessionIds.has(ownerSessionId)
+      ) {
         throw new Error(
-          `[DESIGN-PLAN] Design plan status must be \`ready\` before mutating the Figma canvas. Current status: ${resolvedState.designPlan.status}.`,
+          `[DESIGN-PLAN] Design plan ownership mismatch. This session may only execute artifacts owned by its lineage. Plan owner: ${ownerSessionId}. Current session: ${input.sessionID}.`,
+        );
+      }
+
+      if (!isExecutableDesignPlanStatus(resolvedState.designPlan.status)) {
+        throw new Error(
+          `[DESIGN-PLAN] Design plan status must be \`ready\` or \`approved-for-execution\` before mutating the Figma canvas. Current status: ${resolvedState.designPlan.status}.`,
         );
       }
 

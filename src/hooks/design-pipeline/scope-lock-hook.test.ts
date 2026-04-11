@@ -31,6 +31,7 @@ function buildClassificationBlock(args: {
   targetNode?: string;
   includePlan?: boolean;
   planStatus?: string;
+  ownerSessionId?: string;
 }): string {
   const lines = [
     "Resolve this Figma comment.",
@@ -64,6 +65,7 @@ function buildClassificationBlock(args: {
       "- Difficulty: easy",
       "- Plan Mode: micro",
       "- Created By: Prometheus",
+      ...(args.ownerSessionId ? [`- Owner Session ID: ${args.ownerSessionId}`] : []),
       `- Status: ${args.planStatus ?? "ready"}`,
       "",
       "### Mutation Steps",
@@ -168,6 +170,49 @@ describe("createScopeLockHook", () => {
         { args: { command: 'figma-daemon set text 1:23 "Updated copy"' } } as any,
       ),
     ).rejects.toThrow("status must be `ready`");
+  });
+
+  test("allows mutations when the design plan is approved for execution", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "text_only",
+          requestType: "copy_change",
+          targetNode: "1:23",
+          includePlan: true,
+          planStatus: "approved-for-execution",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set text 1:23 "Updated copy"' } } as any,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+
+  test("blocks mutations when the design plan owner is outside the active lineage", async () => {
+    const hook = createScopeLockHook(
+      createDesignCtx([
+        buildClassificationBlock({
+          editIntent: "text_only",
+          requestType: "copy_change",
+          targetNode: "1:23",
+          includePlan: true,
+          ownerSessionId: "ses-other",
+        }),
+      ]),
+    );
+
+    await expect(
+      hook["tool.execute.before"](
+        { tool: "bash", sessionID: SESSION_ID, callID: "c1" },
+        { args: { command: 'figma-daemon set text 1:23 "Updated copy"' } } as any,
+      ),
+    ).rejects.toThrow("ownership mismatch");
   });
 
   test("blocks frame mutations for text-only intent", async () => {
